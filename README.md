@@ -5,9 +5,6 @@ projelerinde kullanılmak üzere hazırlanmış Claude Code skill kütüphanesi.
 plugin (`ikas-app`) altında toplanır ve Claude Code'un plugin marketplace özelliğiyle
 dağıtılır. Tema (Code Components) skill'leri için kardeş repo: `ikascom/ikas-cc-skills`.
 
-Skill gövdeleri ve kural setleri **İngilizce** (agent'ın en iyi anladığı dil), üretilen
-raporlar **Türkçe**.
-
 ## Kurulum
 
 ```
