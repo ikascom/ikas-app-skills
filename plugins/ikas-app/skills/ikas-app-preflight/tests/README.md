@@ -2,8 +2,10 @@
 
 | Command | What it checks |
 |---|---|
-| `tests/run.sh` | Scanner output on `fixtures/broken-app` equals `expected/broken-app.txt` (section · severity · file:line). `--update` rewrites the snapshot. |
+| `tests/run.sh` | For every `fixtures/<name>`, scanner output equals `expected/<name>.txt` (section · severity · file:line). `--update` rewrites the snapshots. |
 | `IKAS_APP_EXAMPLES=<clone> tests/run.sh` | …plus `scripts/calibrate.sh`: the three official examples must produce zero Blockers. |
+
+`fixtures/external-dashboard` is a shape (b) app written the way rejections R1–R4 describe; the scanner must report the four rejection reasons as Blockers (§2.2 state, §2.2 unbound install, §3.1 spinner, §4 no link).
 
 `fixtures/broken-app` is the official `starter-app` with every defect the fix catalogue has a recipe for, plus the
 two Blockers that have none (`§5.1` unauthenticated route, `§5.2` client-side Admin API call). See its README for the map.

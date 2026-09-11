@@ -1,0 +1,24 @@
+§2.2 BLOCKER src/app/api/oauth/callback/ikas/route.ts:1
+§2.2 BLOCKER src/app/api/oauth/callback/ikas/route.ts:9
+§3.1 BLOCKER src/app/page.tsx:5
+§4 BLOCKER src/app/page.tsx:7
+§2.1 UYARI src/app/api/oauth/authorize/ikas/route.ts:38
+§2.1 UYARI src/globals/config.ts:9
+§2.1 UYARI src/globals/config.ts:9
+§2.1 UYARI src/globals/config.ts:9
+§2.1 UYARI src/globals/config.ts:12
+§2.2 UYARI src/app/api/oauth/callback/ikas/route.ts:1
+§2.2 UYARI src/app/api/oauth/callback/ikas/route.ts:1
+§2.2 UYARI src/app/api/oauth/callback/ikas/route.ts:20
+§2.2 UYARI src/app/callback/page.tsx:25
+§3.3 UYARI src/app/callback/page.tsx:27
+§3.3 UYARI src/helpers/token-helpers.ts:120
+§5.1 UYARI src/app/api/ikas/get-merchant/route.ts:1
+§8 UYARI .env.production:1 [untracked]
+§8 UYARI src/helpers/jwt-helpers.ts:15
+§8 UYARI src/lib/session.ts:18
+§2.1 BILGI src/globals/config.ts:9
+§3.1 BILGI src/app/callback/page.tsx:1
+§4 BILGI -
+§6.2 BILGI -
+BLOCKER: 4 UYARI: 15 BILGI: 4

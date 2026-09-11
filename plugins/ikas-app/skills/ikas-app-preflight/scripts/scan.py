@@ -299,6 +299,11 @@ for p in callback_files:
         add("§2.2", "BLOCKER", p, line_of(t, r"!\s*state|state:\s*z\.string|expired|missing_code") or 1, "Callback requires `state` — Admin-initiated installs arrive with code+storeName only, so every reviewer install fails [observed] R4 (§10 #20) — işlevsel")
     elif has_state and re.search(r"if\s*\(\s*(params\.)?(expectedState|session\.state)\s*\)", tx) and not re.search(r"\bstate\s*&&\s*(params\.)?(session\.state|expectedState)|(session\.state|expectedState)\s*&&\s*(params\.)?state\b", tx):
         add("§2.2", "UYARI", p, line_of(t, r"validateOAuthProof|session\.state|expectedState") or 1, "State is required whenever the session holds one — documented pattern compares only when both exist (`state && session.state && …`); a stale session state rejects a legitimate Admin-initiated callback [docs:auth-steps]")
+    persists = re.search(r"AuthTokenManager\.put|\.(create|upsert|update)\(|INSERT|db\.", tx)
+    if not re.search(r"getMerchant|getAuthorizedApp", tx) and not persists:
+        add("§2.2", "BLOCKER", p, 1, "Callback neither resolves the merchant (getMerchant/getAuthorizedApp) nor persists the token server-side — the install is not bound to the store, the merchant has to 'connect ikas' by hand later [observed] R3 (§10 #21) — işlevsel")
+    elif re.search(r"session\.(accessToken|refreshToken|access_token|refresh_token)\s*=", tx):
+        add("§2.3", "UYARI", p, line_of(t, r"session\.(accessToken|refreshToken|access_token|refresh_token)\s*="), "ikas token written to the browser session cookie instead of a server-side row keyed by authorizedAppId — sealed cookie, so not a leak, but nothing server-side knows the merchant (R3 pattern)")
     if not re.search(r"getMerchant|getAuthorizedApp", t):
         add("§2.2", "UYARI", p, 1, "Callback does not resolve merchant/authorizedApp identity server-side after the exchange (getMerchant + getAuthorizedApp) [docs:callback-api]")
     if re.search(r"(NextResponse\.json|res\.json|cookies\(\)\.set|searchParams\.set)\([^)]*(access_token|refresh_token|accessToken|refreshToken)", t):
@@ -369,9 +374,13 @@ def is_entry_page(p, t):
 
 for p, t in client_pages.items():
     r = rel_route(p)
+    is_root = r in ("page.tsx", "page.jsx", "index.tsx", "index.jsx")
     iframe_signal = re.search(r"getNewToken|getTokenForIframeApp|getAuthorizedAppId|useIkasToken|AppBridgeHelper|useSearchParams|actionRunId", t)
     exempt = re.search(r"authorize-store|login|landing", r)
-    if iframe_signal and "closeLoader" not in t and not imports_loader_hook(t) and not exempt:
+    ext = re.search(r"window\.location\.(href|replace|assign)\s*\(?=?\s*['\"`]https?://", t)
+    if is_root and ext and not re.search(r"window\.self\s*!==?\s*window\.top|window\.top\s*!==?\s*window\.self", t):
+        add("§4", "BLOCKER", p, t[: ext.start()].count("\n") + 1, "Root page redirects the iframe to an external URL with no in-panel screen, link or instruction — the reviewer sees a spinner or a nested login; shape (b) needs a visible link + one-line instruction [observed] R2, R3 (§10 #12) — review")
+    if (iframe_signal or is_root) and "closeLoader" not in t and not imports_loader_hook(t) and not exempt:
         if r.startswith("callback/") and re.search(r"window\.location\.replace|setToken\(", t):
             add("§3.1", "BILGI", p, 1, "Callback page never calls closeLoader() but redirects immediately (starter pattern) — fine top-level; matters only if it can render inside the iframe")
         elif is_entry_page(p, t):
