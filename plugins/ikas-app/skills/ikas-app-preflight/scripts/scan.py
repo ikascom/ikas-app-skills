@@ -249,6 +249,11 @@ def route_group(p):
         return "action"
     if r.startswith("api/"):
         t = files.get(p, "")
+        # name says nothing, body does: an HMAC over a signed envelope is a webhook / API action whatever the path
+        if re.search(r"validateIkasWebhookSignature|getParsedIkasWebhookData|validateIkasWebhookMiddleware", expanded(p)):
+            return "webhook"
+        if re.search(r"createHmac\(", expanded(p)) and re.search(r"actionRunId|idList", expanded(p)):
+            return "action"
         # anonymous storefront route keyed by a per-merchant public key — §9, not §5.1
         if not AUTH_MARKERS.search(t) and PUBLIC_KEY_PARAM.search(t):
             return "public"

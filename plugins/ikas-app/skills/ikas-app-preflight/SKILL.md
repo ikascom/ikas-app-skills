@@ -54,7 +54,7 @@ Also run `git status --porcelain --ignored` in the project root. Untracked and i
 
 Read `ikas.config.json`, `package.json`, `.env.example`, the `src/app` (or `app`) route tree, and the first component the panel renders (`/` and where it redirects). Produce:
 
-- **Routes by kind:** OAuth authorize/callback; admin API (JWT); webhooks; iframe action pages and API action routes; public/storefront endpoints; iframe pages. The route tree, not the scanner, is the source of truth.
+- **Routes by kind:** OAuth authorize/callback; admin API (JWT); webhooks; iframe action pages and API action routes; public/storefront endpoints; iframe pages; operational (health, metrics). The route tree, not the scanner, is the source of truth — open every `api/` route the scanner did not classify by name and decide from the body (an HMAC over `{signature, data}` is a webhook or API action whatever the path is called). If a route's caller still cannot be told from the code (no JWT, no signature, no key, no obvious cron/operator gate), **ask** with AskUserQuestion — "Bu route'u kim çağırıyor?" with options panel (JWT) / ikas webhook or action / storefront (anonymous) / operator or cron — and grade it under the matching §. Never guess a route into §5.1 silence.
 - **App shape** per app-review.md §4 — exactly one of (a) in-panel dashboard, (b) external dashboard, (c) action-only, (d) headless. It decides which §4 row and which DECLARE rows apply.
 - **Paid or free** — `store/app/payment`, `getMerchantLicence`, plan keys.
 - **Requested scopes vs operations** — collect `ikas.queries.X` / `ikas.mutations.X`, map with §11.
