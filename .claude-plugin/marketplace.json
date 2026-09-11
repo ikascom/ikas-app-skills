@@ -1,0 +1,13 @@
+{
+  "name": "ikas-app-skills",
+  "owner": {
+    "name": "ikas"
+  },
+  "plugins": [
+    {
+      "name": "ikas-app",
+      "source": "./plugins/ikas-app",
+      "description": "ikas Admin App (uygulama) geliştirme skill'leri"
+    }
+  ]
+}
