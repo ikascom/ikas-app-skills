@@ -30,7 +30,8 @@ Güncelleme: `/plugin marketplace update ikas-app-skills`
 Bir ikas Admin App'in **App Store review'ı öncesi ön kontrolü.** Ölçüt, skill ile gelen
 `references/app-review.md` kural seti. Her kural kaynağını taşır — `[docs:…]` (builders.ikas.com
 sayfası), `[sdk]` (`@ikas/admin-api-client`, `@ikas/app-helpers`), `[starter]` (resmi
-`ikascom/ikas-app-examples` davranışı), `[security]`, `[observed]` — ve her bulgu ya ihlal
+`ikascom/ikas-app-examples` davranışı), `[partner-panel]` (Partner panel ekranları), `[mcp]` (canlı Admin API şeması), `[security]`,
+`[observed]` (gerçek review ret mesajları, §12 R1–R7) — ve her bulgu ya ihlal
 ettiği bölümü zikreder (§2.2, §6.1, §10 #4…) ya da "kontrat dışı" etiketlenir.
 
 **Kalibrasyon kuralı:** resmi örnek uygulamalar bu kural setinden **sıfır review-Blocker** ile
@@ -57,7 +58,7 @@ flowchart TD
     B --> C[Kod okuma — merchant yolculuğu<br/>kurulum → callback → günlük giriş → aksiyon → plan → kaldırma]
     C --> D[Güvenlik katmanı<br/>§5 JWT · §6 webhook imza · §7 action imza · §8 secret · §9 public uç]
     D --> E[§10 anti-pattern taraması #1–#19]
-    E --> F[Türkçe rapor<br/>Karar · Blocker · Uyarı · Beyan · Bilgi · Kontrat dışı · Aksiyon listesi]
+    E --> F[Türkçe rapor<br/>Karar · Bir bakışta · Blocker · Uyarı · Beyan · Bilgi · Kontrat dışı · Aksiyon listesi]
     F --> G{Katalogda tarif var mı?}
     G -- hayır --> H[Dur]
     G -- evet --> I[Soru: düzeltmeleri uygulayayım mı?]
@@ -92,15 +93,22 @@ uygulanır, type-check koşulur, `git diff --stat` raporlanır. Onay verilmeden 
 ```
 skills/ikas-app-preflight/
 ├── SKILL.md                        # prosedür, argümanlar, onay akışı (İngilizce)
-├── references/app-review.md        # kaynak etiketli kural seti §0–§12
+├── references/app-review.md        # kaynak etiketli kural seti §0–§12 (+ gerçek ret listesi R1–R7)
 ├── references/report-template.md   # Türkçe rapor şablonu + örnek
-├── references/fix-catalogue.md     # onay sonrası uygulanabilir tarifler F1–F13
-└── scripts/scan.py                 # kanıt tarayıcısı (--json destekler)
+├── references/fix-catalogue.md     # onay sonrası uygulanabilir tarifler F1–F14
+├── scripts/scan.py                 # kanıt tarayıcısı (--json, --section; import'ları takip eder; App + Pages Router)
+├── scripts/calibrate.sh            # resmi örneklerde sıfır Blocker kapısı
+└── tests/                          # fixture'lar + snapshot testi (tests/run.sh)
 ```
 
-**Kalibrasyon testi:** `ikascom/ikas-app-examples` altındaki üç örnek için
-`python3 scripts/scan.py <örnek>` çıktısında `BLOCKER: 0` beklenir. Kural seti değişince tekrar
-koşturun.
+**Testler:** `tests/run.sh` — `tests/fixtures/broken-app` (starter + katalogdaki her kusur) ve
+`tests/fixtures/external-dashboard` (R1–R4 ret senaryoları) için scanner çıktısı snapshot ile
+karşılaştırılır; `IKAS_APP_EXAMPLES=<klon> tests/run.sh` ayrıca üç resmi örnekte `BLOCKER: 0`
+kapısını koşar. Kural seti, scanner veya bir tarif değişince ikisi de koşturulur.
+
+**Yeni bir ret sebebi geldiğinde:** mesajı `app-review.md` §12 › Rejections tablosuna R-numarasıyla
+ekle, ilgili § kuralını `[observed] R<n>` ile güncelle, gerekiyorsa fixture'a kusuru ekle ve
+`tests/run.sh --update` ile snapshot'ı yenile.
 
 > `scan.py` yalnızca kanıt toplar — bir bulgu "okunacak yer", bulgu yokluğu "kanıtlanmış"
 > değildir. Nihai karar SKILL.md'deki adımlarda kod okunarak verilir.

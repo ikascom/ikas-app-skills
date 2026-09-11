@@ -1,0 +1,17 @@
+name: ikas-app-preflight tests
+on:
+  push:
+    paths: ['plugins/ikas-app/skills/ikas-app-preflight/**']
+  pull_request:
+    paths: ['plugins/ikas-app/skills/ikas-app-preflight/**']
+jobs:
+  scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: clone official examples (calibration gate)
+        run: git clone --depth 1 https://github.com/ikascom/ikas-app-examples.git /tmp/ikas-app-examples
+      - name: snapshot + calibration
+        run: IKAS_APP_EXAMPLES=/tmp/ikas-app-examples plugins/ikas-app/skills/ikas-app-preflight/tests/run.sh
