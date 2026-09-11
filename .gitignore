@@ -6,3 +6,6 @@ Thumbs.db
 .vscode/
 __pycache__/
 *.pyc
+
+# local run logs / customer reports
+test-runs/

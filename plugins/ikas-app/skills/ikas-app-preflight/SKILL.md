@@ -12,7 +12,7 @@ Predict what the ikas reviewer and the merchant will experience, and find the se
 
 **Anchoring rule.** Every finding cites a § from app-review.md (with its source tag) or is labeled *kontrat dışı*. No § → not a finding. Code style, naming, CSS, tests and business logic are out of scope.
 
-**Calibration rule.** The official example apps (`ikascom/ikas-app-examples`) must come out with zero review-Blockers under this ruleset. A rule that would fail the official starter is a hardening Uyarı unless it is an exploitable hole. When in doubt, read app-review.md §0 and the `[starter]` tags — do not grade from memory of a template.
+**Calibration rule.** The official example apps (`ikascom/ikas-app-examples`) must come out with zero review-Blockers under this ruleset. A rule that would fail the official starter is a hardening Uyarı unless it is an exploitable hole. When in doubt, read app-review.md §0 and the `[starter]` tags — do not grade from memory of a template. `scripts/calibrate.sh` runs the scanner over the three official examples and fails on any Blocker; `tests/run.sh` snapshots the scanner on `tests/fixtures/broken-app` (a starter with every catalogued defect injected) — run both after changing `scan.py`, the ruleset or a recipe.
 
 **Honesty rule.** Some prerequisites live outside the code (partner verification, two dev stores, reviewer test account, Partner-panel webhook registration). They are questions in the report, never passes. Never write "review'dan geçer"; write "bu kural setine göre Blocker kalmadı".
 
@@ -22,7 +22,7 @@ Predict what the ikas reviewer and the merchant will experience, and find the se
 |---|---|
 | *(none)* or a path | Full preflight — Steps 1–6 |
 | `quick` | Step 1 (scanner) + Step 4 (anti-pattern sweep) only; say so in the report header |
-| `section <area>` | Step 1 scoped + the matching § in Steps 2–3: `oauth` = §2; `iframe` = §3 + §4; `webhooks` = §6; `actions` = §7; `secrets` = §8 + §5.1/§5.3; `public` = §9 + §5.2. §10 is always in scope |
+| `section <area>` | Step 1 with `--section <area>` (scanner prints only the matching §) + the matching § in Steps 2–3: `oauth` = §2; `iframe` = §3 + §4; `webhooks` = §6; `actions` = §7; `secrets` = §8 + §5.1/§5.3; `public` = §9 + §5.2. §10 is always in scope |
 
 The project root is the last argument if it is a path, otherwise the current working directory. Steps 1–5 change nothing: no edits, no `git` writes. Step 6 edits only after the user says yes.
 
@@ -46,9 +46,9 @@ Preflight:
 python3 ${CLAUDE_SKILL_DIR}/scripts/scan.py <project-root>
 ```
 
-Output lines are `§ | severity | file:line | message`. Treat every hit as **a place to read** and every silence as **nothing proven** — it is regex over files; a hand-rolled token exchange or a webhook route named `notify` slips past it. Keep the output; it is the evidence column. If it prints `ikas app not detected`, stop and tell the user this skill is for Admin Apps (Next.js + `@ikas/admin-api-client` / `@ikas/app-helpers`).
+Output lines are `§ | severity | file:line | message`. The scanner follows a route's local imports two levels deep (`@/` alias from tsconfig), so a signature or JWT check that lives in `lib/webhooks.ts` or `lib/auth-helpers.ts` is credited to the route and reported as `(via <module>)`. Treat every hit as **a place to read** and every silence as **nothing proven** — it is regex over files; a hand-rolled token exchange or a webhook route named `notify` slips past it. Keep the output; it is the evidence column. If it prints `ikas app not detected`, stop and tell the user this skill is for Admin Apps (Next.js + `@ikas/admin-api-client` / `@ikas/app-helpers`). Pages Router projects (`pages/api/**`) are scanned too — a §1 Bilgi line says so; the official examples are App Router, so read §3 evidence by hand there.
 
-Also run `git status --porcelain --ignored` in the project root. Untracked and ignored files are still audited — they ship if the deploy is built from this tree — but the report marks them.
+Also run `git status --porcelain --ignored` in the project root. Untracked and ignored files are still audited — they ship if the deploy is built from this tree — but the report marks them. Not a repository → header says `Git: repo yok`, `.gitignore` absence is a §8 Uyarı, and no per-file git tags are possible.
 
 ### Step 2 — Inventory and app shape
 
@@ -85,17 +85,23 @@ Read app-review.md §10 and check items #1–#19 explicitly. Cite as `§10 #n`; 
 
 ### Step 5 — Report
 
-Write the report in Turkish following `references/report-template.md` exactly: Karar → Blocker'lar → Uyarılar → Beyan gerekli → Bilgi → Kontrat dışı (max 5) → Öncelikli aksiyon listesi. Evidence = `path:line` + what you saw. Build the Beyan table from §1 and the app shape:
+Write the report in Turkish following `references/report-template.md` exactly: Karar → Bir bakışta → Blocker'lar → Uyarılar → Beyan gerekli → Bilgi → Kontrat dışı (max 5) → Öncelikli aksiyon listesi. Evidence = `path:line` + what you saw. Build the Beyan table from §1 and the app shape:
 
 | Soru | Neden |
 |---|---|
 | Partner hesabı oluşturuldu ve uygulama bu hesaba eklendi mi? | §1 #1 |
 | Partner hesabı doğrulandı mı? | §1 #2 |
-| Uygulama en az 2 geliştirme mağazasında kurulu ve test edilebilir mi? Mağaza adları? | §1 #5 |
-| (Shape b) Reviewer için çalışan bir test hesabı gönderim notlarına eklenecek mi? | §4 (b) |
-| (Paid) Planlar Partner panelinde tanımlandı ve bölgelerle eşlendi mi? | §1, §6.4 |
-| (Webhook route exists, no `saveWebhooks` call) Webhook'lar Partner panelinde `<deployUrl><path>` için tanımlı mı? | §6.2 |
-| Partner panelindeki izin listesi koddaki scope listesiyle birebir aynı mı? (özellikle koddan eksik/fazla görünen scope'lar) | §2.1 |
+| Uygulama en az 2 geliştirme mağazasında kurulu ve test edilebilir mi? Partner panel › İzin Verilen Mağazalar'da "Kullanımda" görünen mağaza adları? | §1 #5 `[partner-panel]` |
+| (Shape b) Reviewer için harici panelde çalışan bir test hesabı dev@ikas.com'a gönderilecek mi? Review bunsuz ilerlemiyor | §4 (b) `[observed]` R1 |
+| (Storefront app) Script kurulumda otomatik ekleniyor, kaldırmada otomatik siliniyor mu? (kodda `createStorefrontJSScript` kurulum yolunda, `deleteStorefrontJSScript` uninstall handler'da) | §6.2 `[observed]` R5 |
+| Uygulama bağımsız, somut bir işlev sunuyor mu — yalnızca iletişim/tanıtım ekranı değil mi? | §1 `[observed]` R6 |
+| (Paid) Partner panel › Planlar'da planlar tanımlı ve Yayınlama'da her bölgenin "Bölgedeki Aktif Planlar"ı doğru para biriminde mi? Plan açıklamaları girildi mi? | §1, §6.4 `[partner-panel]` |
+| (Actions) Partner panel › Aksiyonlar'daki kayıtlar `ikas.config.json` `actions[]` ile aynı URL/tip/method mü? | §7 `[partner-panel]` |
+| Yayınlama › listeleme "Herkese Açık" mı hedefleniyor (review'a giden), yoksa "Gizli" mi (review yok, Kurulum Adresi ile kurulur)? | §1 `[docs:build-publish]` `[partner-panel]` |
+| (Webhook route handles `store/app/deleted` / `store/app/payment`) Partner panel › Konfigürasyon › **Bildirim Adresi** `<deployUrl><route>` olarak girildi mi? Bu iki scope yalnızca oradan gelir, `saveWebhooks` ile alınamaz | §6.2, §6.4 `[partner-panel]` |
+| (Data webhook route exists, no `saveWebhooks` call) `store/order/*` vb. webhook'lar `saveWebhooks` ile kaydediliyor mu, değilse nasıl tanımlanacak? | §6.2 |
+| Partner panel › Uygulama Yetkileri koddaki scope listesiyle birebir aynı mı? ("Tüm Yetkiler" işaretliyse kodda dar scope varken fazla izin istenmiş olur) | §2.1 `[partner-panel]` |
+| Partner panel › Uygulama Adresi = `<deployUrl>` ve Yönlendirme Adresi = `<deployUrl><oauthRedirectPath>` mi? | §2.1, §8 `[partner-panel]` |
 | Production `NEXT_PUBLIC_DEPLOY_URL` gerçek URL'e set edildi mi (Host-header fallback yalnızca localhost'ta devrede)? | §2.1 |
 
 ### Step 6 — Ask, then fix
@@ -110,6 +116,7 @@ If nothing matches a recipe, say so and stop. On yes: read `references/fix-catal
 ## Common mistakes
 
 - Failing the official starter. `Math.random` state, `'api'` storeName fallback, `if (state && session.state && …)`, unconditional `window.location.replace(redirectUrl)`, browser-console logging of the app JWT, no uninstall webhook — all official-example behaviour → Uyarı or Bilgi, never review-Blocker.
+- Requiring `state` on the callback. ikas sends Admin-initiated installs straight to the Redirect Address with `code`+`storeName` only (`[observed]` R4); `if (!state) → 400` fails every reviewer install — Blocker, not hardening.
 - Calling `signature && …` on the **callback** a hole. It is the documented posture. On **webhooks that mutate state** and on **API actions** the signature is always present and must be verified — that is where Blockers live.
 - Passing §4 because `closeLoader()` exists. Necessary, not sufficient: a blank screen after it is §10 #13.
 - Rejecting an external dashboard on sight. Shape (b) is allowed; it fails only without the in-iframe link/instruction; the test account is a Beyan row.

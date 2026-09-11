@@ -15,7 +15,10 @@ The report is written **in Turkish** regardless of the language of SKILL.md, unl
 
 **Karar:** <tek cümle: review'a gönderilebilir mi; en büyük risk ne>
 **Uygulama şekli:** §4 (a|b|c|d) <kısa açıklama> · **Plan:** ücretsiz | ücretli
-**Mod:** tam | quick | section <alan> · **Scanner:** <n> route, <n> client page · **Git:** temiz | <n> untracked | commit yok
+**Mod:** tam | quick | section <alan> · **Scanner:** <n> route, <n> client page · **Git:** temiz | <n> untracked | commit yok | repo yok
+
+## 0. Bir bakışta
+<3–6 madde, teknik olmayan biri için: uygulama ne yapıyor; kurulum/kaldırma/webhook/aksiyon güvenliği ne durumda; göndermeden önce yapılması gereken 1–3 şey; kod dışında kapatılması gereken beyanlar. Madde başına bir cümle, § referansı yok.>
 
 ## 1. Blocker'lar
 | # | Bulgu | Kanıt | Dayanak | Neden Blocker |
@@ -60,6 +63,7 @@ Uygulanmayanlar: F4 — ön koşul sağlanmadı (config zaten normalize ediyor)
 - **Kanıt** — `path:line` plus what you saw there, enough to verify without re-auditing. Quote the scanner line when it *is* the evidence. Mark files that are `untracked` or `gitignored` (`git status --porcelain --ignored`) — they are still in the working tree and will ship if deployed from it.
 - **Dayanak** — § reference(s) and the source tag from app-review.md (`[docs:…]`, `[sdk]`, `[security]`, `[observed]`). A finding with no § is **kontrat dışı** and goes to section 5.
 - **Neden Blocker** — exactly one of `güvenlik`, `review`, `işlevsel` (see app-review.md §0). When the basis is `[observed]`, say "gözlemlenen ret, dokümante değil".
+- **Bir bakışta** — plain Turkish for the developer's manager or the reviewer contact; no §, no file paths, no severity jargon. It summarises, never adds a finding that is not in sections 1–3.
 - **Karar** — honest. "Şu iki düzeltmeyle gönderilebilir" is fine when the Blockers are each a small, obvious change. With no Blocker: "Bu kural setine göre Blocker kalmadı; en yüksek öncelikli uyarı: …" (name one). Never say "review'dan geçer".
 - Sort: Blockers — güvenlik first, then review, then işlevsel. Uyarılar — by §.
 - Do not list Uyarı-level items in the Blocker table to make the report look thorough; do not hide a Blocker in Bilgi to make it look clean.
@@ -71,7 +75,13 @@ Uygulanmayanlar: F4 — ön koşul sağlanmadı (config zaten normalize ediyor)
 
 **Karar:** İki dosyalık düzeltmeyle gönderilebilir; en büyük risk çalışma ağacında duran imzasız test webhook route'u.
 **Uygulama şekli:** §4 (a) panel içi dashboard · **Plan:** ücretsiz
-**Mod:** tam · **Scanner:** 16 route, 6 client page
+**Mod:** tam · **Scanner:** 16 route, 6 client page · **Git:** 1 untracked
+
+## 0. Bir bakışta
+- Rush, mağazaya kampanya ve widget ekleyen panel içi bir uygulama; kurulum ve giriş akışı çalışıyor.
+- Çalışma ağacında imzasız bir test webhook route'u var; silinmeden gönderilmemeli.
+- Bir admin route'u kaldırılmış mağazaların token'ını reddetmiyor; tek satırlık düzeltme.
+- Partner panelinde 4 fazla izin ve uninstall webhook kaydı kontrol edilmeli.
 
 ## 1. Blocker'lar
 | # | Bulgu | Kanıt | Dayanak | Neden Blocker |

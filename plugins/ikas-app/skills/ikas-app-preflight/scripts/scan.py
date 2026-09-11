@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ikas Admin App pre-review scanner — evidence pass for the ikas-app-preflight skill.
 
-Usage: python3 scan.py [project root] [--json]
+Usage: python3 scan.py [project root] [--json] [--section oauth|iframe|webhooks|actions|secrets|public]
 
 Walks a Next.js (App Router) ikas app and prints pattern-level evidence for the
 rules in references/app-review.md, one finding per line:
@@ -23,8 +23,14 @@ import re
 import subprocess
 import sys
 
-ROOT = os.path.abspath(next((a for a in sys.argv[1:] if not a.startswith("--")), "."))
+ROOT = os.path.abspath(next((a for i, a in enumerate(sys.argv[1:], 1) if not a.startswith("--") and sys.argv[i - 1] != "--section"), "."))
 AS_JSON = "--json" in sys.argv
+SECTION_MAP = {"oauth": ("§2",), "iframe": ("§3", "§4"), "webhooks": ("§6",), "actions": ("§7",), "secrets": ("§8", "§5.1", "§5.3"), "public": ("§9", "§5.2")}
+_sec = next((sys.argv[i + 1] for i, a in enumerate(sys.argv) if a == "--section" and i + 1 < len(sys.argv)), None)
+SECTION_FILTER = SECTION_MAP.get(_sec) if _sec else None
+if _sec and not SECTION_FILTER:
+    print(f"unknown --section '{_sec}' (use {', '.join(SECTION_MAP)})")
+    sys.exit(0)
 
 SKIP_DIRS = {"node_modules", ".next", ".git", "dist", "build", "out", "coverage", ".turbo", "generated"}
 SRC_EXT = (".ts", ".tsx", ".js", ".jsx", ".mjs")
@@ -116,8 +122,15 @@ if not (has_cfg or has_sdk or has_bridge):
     sys.exit(0)
 
 app_dir = next((d for d in (os.path.join(ROOT, "src", "app"), os.path.join(ROOT, "app")) if os.path.isdir(d)), None)
+pages_router = False
 if not app_dir:
-    add("§1", "BILGI", None, None, "No App Router directory (src/app or app) — route-based checks skipped")
+    # Pages Router fallback: pages/api/**.ts are routes, pages/**.tsx are (client-rendered) pages
+    app_dir = next((d for d in (os.path.join(ROOT, "src", "pages"), os.path.join(ROOT, "pages")) if os.path.isdir(d)), None)
+    pages_router = bool(app_dir)
+    if pages_router:
+        add("§1", "BILGI", None, None, f"Pages Router project ({os.path.relpath(app_dir, ROOT)}) — routes = pages/api/**, pages = pages/**; the official examples use the App Router, so read §3 evidence by hand")
+    else:
+        add("§1", "BILGI", None, None, "No App Router directory (src/app or app) and no pages/ — route-based checks skipped")
 
 files = {p: read(p) for p in walk_src()}
 app_files = {p: t for p, t in files.items() if app_dir and p.startswith(app_dir + os.sep)}
@@ -128,7 +141,96 @@ def rel_route(p):
 
 
 def is_route(p):
+    if pages_router:
+        return p in app_files and rel_route(p).startswith("api/") and not os.path.basename(p).startswith("_")
     return os.path.basename(p).startswith("route.") and p in app_files
+
+
+def is_page_file(p):
+    if pages_router:
+        return p in app_files and not rel_route(p).startswith("api/") and not os.path.basename(p).startswith("_") and p.endswith((".tsx", ".jsx"))
+    return os.path.basename(p).startswith("page.")
+
+
+# ---------------------------------------------------------------- local import resolution
+# Routes often delegate the signature / JWT / schema check to a helper module
+# (`lib/webhooks.ts`, `lib/auth-helpers.ts`). Markers are searched in the route
+# file plus the local modules it imports (two levels), so a check that lives in
+# a helper is not reported as missing. Still evidence, not proof.
+alias_map = {}
+for cfg_name in ("tsconfig.json", "jsconfig.json"):
+    cfg_p = os.path.join(ROOT, cfg_name)
+    if os.path.exists(cfg_p):
+        try:
+            raw = re.sub(r"//[^\n]*|/\*.*?\*/", "", read(cfg_p), flags=re.S)
+            raw = re.sub(r",\s*([}\]])", r"\1", raw)
+            paths = json.loads(raw).get("compilerOptions", {}).get("paths", {})
+            for k, v in paths.items():
+                if v:
+                    alias_map[k.rstrip("*")] = os.path.join(ROOT, v[0].rstrip("*"))
+        except (json.JSONDecodeError, AttributeError):
+            pass
+        break
+if not alias_map:
+    alias_map["@/"] = os.path.join(ROOT, "src") if os.path.isdir(os.path.join(ROOT, "src")) else ROOT
+
+IMPORT_RE = re.compile(r"""(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]""")
+
+
+def resolve_import(from_file, spec):
+    if spec.startswith("."):
+        base = os.path.normpath(os.path.join(os.path.dirname(from_file), spec))
+    else:
+        hit = next((a for a in alias_map if spec.startswith(a)), None)
+        if not hit:
+            return None
+        base = os.path.normpath(os.path.join(alias_map[hit], spec[len(hit):]))
+    for cand in (base,) + tuple(base + e for e in SRC_EXT) + tuple(os.path.join(base, "index" + e) for e in SRC_EXT):
+        if cand in files:
+            return cand
+    return None
+
+
+def local_imports(p, depth=2, seen=None):
+    seen = seen if seen is not None else set()
+    for spec in IMPORT_RE.findall(files.get(p, "")):
+        q = resolve_import(p, spec)
+        if q and q not in seen and q != p:
+            seen.add(q)
+            if depth > 1:
+                local_imports(q, depth - 1, seen)
+    return seen
+
+
+_expanded = {}
+
+
+def expanded(p):
+    """Route text plus the text of its local imports (2 levels)."""
+    if p not in _expanded:
+        _expanded[p] = "\n".join([files.get(p, "")] + [files[q] for q in sorted(local_imports(p))])
+    return _expanded[p]
+
+
+def route_text(p):
+    """Own text; for a pure re-export (`export { POST } from '../payment/route'`) the target's text."""
+    t = files.get(p, "")
+    m = re.search(r"export\s*\{[^}]*\}\s*from\s*['\"]([^'\"]+)['\"]", t)
+    if m and len(re.sub(r"//[^\n]*", "", t).strip()) < 200:
+        q = resolve_import(p, m.group(1))
+        if q:
+            return files[q]
+    return t
+
+
+def via(p, pattern):
+    """Name the imported module where `pattern` is found, or '' when it is in the route itself."""
+    if re.search(pattern, files.get(p, "")):
+        return ""
+    for q in sorted(local_imports(p)):
+        if re.search(pattern, files[q]):
+            return f" (via {os.path.relpath(q, ROOT)})"
+    return ""
 
 
 PUBLIC_KEY_PARAM = re.compile(r"(searchParams\.get|body\.|params\.)\s*\(?\s*['\"]?(publicApiKey|publicKey|apiKey|storefrontKey)")
@@ -167,20 +269,31 @@ if not callback_files:
     add("§2.2", "BILGI", None, None, "No OAuth callback (getTokenWithAuthorizationCode) found — hand-rolled exchange or headless app? Inventory the routes by hand")
 for p in callback_files:
     t = files[p]
-    has_sig = bool(re.search(r"validateCodeSignature|createHmac", t))
-    has_state = bool(re.search(r"session\.state|savedState|stateStore", t))
+    tx = expanded(p)
+    has_sig = bool(re.search(r"validateCodeSignature|createHmac", tx))
+    has_state = bool(re.search(r"session\.state|savedState|stateStore|expectedState", tx))
     if not has_sig and not has_state:
         add("§2.2", "UYARI", p, 1, "Callback verifies neither the code signature (HMAC-SHA256(code, CLIENT_SECRET)) nor the session state — documented pattern checks both when present [docs:auth-steps]")
     elif not has_sig:
         add("§2.2", "UYARI", p, 1, "Callback does not verify the `signature` query param (HMAC-SHA256(code, CLIENT_SECRET)) [docs:auth-steps] — defence in depth, not a hole")
-    elif "timingSafeEqual" not in t and not any("timingSafeEqual" in files[q] for q in files if "validateCodeSignature" in files[q]):
+    elif "timingSafeEqual" not in tx:
         add("§2.2", "BILGI", p, line_of(t, r"validateCodeSignature|createHmac"), "Signature compared with === (starter does the same); timingSafeEqual is hardening (F9)")
-    if has_state and not re.search(r"delete\s+session\.state|session\.state\s*=\s*undefined|state:\s*undefined|consumeState|clearState", t):
+    if has_state and not re.search(r"delete\s+session\.state|session\.state\s*=\s*undefined|state:\s*undefined|consumeState|clearState", tx):
         add("§2.2", "UYARI", p, line_of(t, r"session\.state"), "State is compared but never cleared after the exchange — replayed callback passes the state check")
-    if re.search(r"catch[^\n]*\{[^}]*(Callback failed|callback failed)", t, re.S) and not re.search(r"response\?\.status|\.status\b.*\.data|TokenExchangeError|error\.response", t):
-        add("§2.2", "UYARI", p, line_of(t, r"Callback failed"), "Token-exchange failures reported as an opaque 'Callback failed' (§10 #8)")
-    if re.search(r"console\.(log|info|debug)\([^)]*(access_token|refresh_token|accessToken|refreshToken|client_secret|clientSecret)", t):
-        add("§8", "BLOCKER", p, line_of(t, r"console\.(log|info|debug)\([^)]*(access_token|refresh_token|accessToken|refreshToken|client_secret|clientSecret)"), "ikas token / client secret written to server logs (§10 #10) — güvenlik")
+    if re.search(r"catch[^\n]*\{[^}]*(Callback failed|callback failed|tamamlanamadı)", t, re.S) and not re.search(r"response\?\.status|\.status\b.*\.data|TokenExchangeError|error\.response", t):
+        logs_error = re.search(r"catch\s*\((\w+)\)[^}]*console\.error\([^)]*\b\1\b", t, re.S)
+        add("§2.2", "UYARI", p, line_of(t, r"Callback failed|tamamlanamadı"), "Token-exchange failures reported as an opaque 'Callback failed' (§10 #8)" + ("" if logs_error else " — and the caught error is not logged at all, install failures are undiagnosable"))
+    requires_state = False
+    for m in re.finditer(r"if\s*\(\s*!\s*(state|params\.state)\s*(\|\||\))", tx):
+        if not re.search(r"session\.state|expectedState|savedState", tx[max(0, m.start() - 300): m.start()]):
+            requires_state = True  # `if (!state)` outside a session-state guard
+    schema_state = re.search(r"state:\s*z\.string\([^\n]*", tx)
+    if schema_state and "optional" not in schema_state.group(0) and "nullish" not in schema_state.group(0):
+        requires_state = True
+    if requires_state or re.search(r"install link has expired|missing_code", tx):
+        add("§2.2", "BLOCKER", p, line_of(t, r"!\s*state|state:\s*z\.string|expired|missing_code") or 1, "Callback requires `state` — Admin-initiated installs arrive with code+storeName only, so every reviewer install fails [observed] R4 (§10 #20) — işlevsel")
+    elif has_state and re.search(r"if\s*\(\s*(params\.)?(expectedState|session\.state)\s*\)", tx) and not re.search(r"\bstate\s*&&\s*(params\.)?(session\.state|expectedState)|(session\.state|expectedState)\s*&&\s*(params\.)?state\b", tx):
+        add("§2.2", "UYARI", p, line_of(t, r"validateOAuthProof|session\.state|expectedState") or 1, "State is required whenever the session holds one — documented pattern compares only when both exist (`state && session.state && …`); a stale session state rejects a legitimate Admin-initiated callback [docs:auth-steps]")
     if not re.search(r"getMerchant|getAuthorizedApp", t):
         add("§2.2", "UYARI", p, 1, "Callback does not resolve merchant/authorizedApp identity server-side after the exchange (getMerchant + getAuthorizedApp) [docs:callback-api]")
     if re.search(r"(NextResponse\.json|res\.json|cookies\(\)\.set|searchParams\.set)\([^)]*(access_token|refresh_token|accessToken|refreshToken)", t):
@@ -204,10 +317,21 @@ if has_cfg:
             add("§8", "UYARI", ikas_cfg_path, 1, "ikas.config.json has no oauthRedirectPath")
         elif app_dir:
             target = os.path.join(app_dir, redirect_path.strip("/"))
-            if not any(os.path.exists(os.path.join(target, f"route.{ext}")) for ext in ("ts", "js", "tsx")):
+            if not any(os.path.exists(os.path.join(target, f"route.{ext}")) for ext in ("ts", "js", "tsx")) and not any(os.path.exists(target + f".{ext}") for ext in ("ts", "js", "tsx")):
                 add("§8", "BLOCKER", ikas_cfg_path, 1, f"oauthRedirectPath '{redirect_path}' has no matching route handler under {os.path.relpath(app_dir, ROOT)} — işlevsel")
         for action in cfg.get("actions", []) or []:
-            add("§7", "BILGI", ikas_cfg_path, 1, f"Action configured: {json.dumps(action)[:120]} — verify its page/route exists and follows §7")
+            url = action.get("actionUrl") or ""
+            path = re.sub(r"^https?://[^/]+", "", url).split("?")[0].strip("/")
+            method = action.get("method")
+            target = os.path.join(app_dir, path) if app_dir and path else None
+            kinds = ("route",) if method == "api" else ("page",)
+            exists = target and (any(os.path.exists(os.path.join(target, f"{k}.{ext}")) for k in kinds for ext in ("ts", "tsx", "js", "jsx"))
+                                 or any(os.path.exists(target + f".{ext}") or os.path.exists(os.path.join(target, f"index.{ext}")) for ext in ("ts", "tsx", "js", "jsx")))
+            label = f"{action.get('name')!r} ({method}, {action.get('type')}) → /{path}"
+            if exists:
+                add("§7", "BILGI", ikas_cfg_path, 1, f"Action {label} — {kinds[0]} exists; audit under §7.{'2' if method == 'api' else '1'}")
+            else:
+                add("§7", "UYARI", ikas_cfg_path, 1, f"Action {label} — no matching {kinds[0]} under {os.path.relpath(app_dir, ROOT) if app_dir else 'app'}; Partner-panel URL may differ from the local config, confirm")
     except json.JSONDecodeError:
         add("§8", "UYARI", ikas_cfg_path, 1, "ikas.config.json is not valid JSON")
 
@@ -218,7 +342,7 @@ for p, t in files.items():
         add("§2.1", "UYARI", p, t[: m.start()].count("\n") + 1, "Raw NEXT_PUBLIC_DEPLOY_URL concatenated into the redirect URI without trailing-slash normalization — a trailing slash in env breaks the byte-identical match (§10 #6, F4)")
 
 # ---------------------------------------------------------------- §3 iframe pages
-client_pages = {p: t for p, t in app_files.items() if os.path.basename(p).startswith("page.") and re.search(r"['\"]use client['\"]", t)}
+client_pages = {p: t for p, t in app_files.items() if is_page_file(p) and (pages_router or re.search(r"['\"]use client['\"]", t))}
 hooks_with_loader = {p for p, t in files.items() if "closeLoader" in t}
 
 
@@ -235,7 +359,7 @@ def imports_loader_hook(t):
 def is_entry_page(p, t):
     """Pages the panel loads as the first document: root, iframe action pages, callback."""
     r = rel_route(p)
-    return r in ("page.tsx", "page.jsx", "page.ts", "page.js") or bool(re.search(r"actionRunId|idList|orderPackageId", t)) or r.startswith("callback/")
+    return r in ("page.tsx", "page.jsx", "page.ts", "page.js", "index.tsx", "index.jsx") or bool(re.search(r"actionRunId|idList|orderPackageId", t)) or r.startswith("callback/") or r.startswith("callback.")
 
 
 for p, t in client_pages.items():
@@ -257,9 +381,19 @@ for p, t in client_pages.items():
 
 for p, t in files.items():
     for m in re.finditer(r"window\.location\.(replace|assign|href)\s*\(?\s*=?\s*\(?\s*(redirectUrl|adminUrl|[a-zA-Z_.]*admin[a-zA-Z_.]*)", t, re.I):
-        context = t[max(0, m.start() - 800): m.start()]
-        if not re.search(r"window\.self\s*!==?\s*window\.top|window\.top\s*!==?\s*window\.self|inIframe|isIframe", context):
-            add("§3.3", "UYARI", p, t[: m.start()].count("\n") + 1, "Top-level redirect to the Admin URL with no iframe branch — starter does this; nests a second Admin only if the callback lands inside the iframe (§10 #5, F5)")
+        context = t[: m.start()]
+        if not re.search(r"window\.self\s*!==?\s*window\.top|window\.top\s*!==?\s*window\.self|inIframe|isIframe", context[-800:]):
+            # is the enclosing function ever called from a file that imports this module? (helper left over from the starter)
+            fn = [(m2.group(1) or m2.group(2) or m2.group(3), bool(m2.group(1))) for m2 in re.finditer(r"static\s+(\w+)\s*=\s*(?:async\s*)?\(|function\s+(\w+)\s*\(|const\s+(\w+)\s*=\s*(?:async\s*)?\(", context)]
+            name, is_static = fn[-1] if fn else (None, False)
+            importers = [q for q in files if q != p and p in local_imports(q, depth=1)]
+            # static method → must be called as Class.name(; plain export → named import + bare call
+            call_re = r"\." + re.escape(name) + r"\s*\(" if is_static else r"import\s*\{[^}]*\b" + re.escape(name) + r"\b[^}]*\}[\s\S]*(?<![\w.])" + re.escape(name) + r"\s*\("
+            called = name and any(re.search(call_re, files[q]) for q in importers)
+            if name and not called and not is_route(p) and p not in client_pages:
+                add("§3.3", "BILGI", p, t[: m.start()].count("\n") + 1, f"`{name}` does a top-level Admin redirect with no iframe branch but is never called from another file — dead starter code; F5 not needed unless it is wired up")
+            else:
+                add("§3.3", "UYARI", p, t[: m.start()].count("\n") + 1, "Top-level redirect to the Admin URL with no iframe branch — starter does this; nests a second Admin only if the callback lands inside the iframe (§10 #5, F5)")
         break
 
 # sentinel throw ('redirectUrl-called') not caught in the callback page effect
@@ -284,14 +418,30 @@ wrappers = {p: t for p, t in files.items() if not is_route(p) and TOKEN_LOAD.sea
 wrappers_with_deleted = {p for p, t in wrappers.items() if DELETED_CHECK.search(t)}
 wrappers_without_deleted = set(wrappers) - wrappers_with_deleted
 routes_self_loading = []
+
+
+def auth_expanded(p):
+    """Route text plus only the imported modules that define an auth guard (getUserFromRequest / withMerchant …)."""
+    guards = [files[q] for q in local_imports(p) if re.search(r"(function|const)\s+(getUserFromRequest|withMerchant|verifyToken|verifyJwt|requireAuth|getAuthedUser)\b", files[q])]
+    return "\n".join([files.get(p, "")] + guards)
+
+
 for p, t in app_files.items():
     if not is_route(p):
         continue
     g = route_group(p)
     r = rel_route(p)
-    if g == "api" and not auth_markers.search(t):
-        add("§5.1", "BLOCKER", p, 1, "Admin API route has no JWT verification marker (getUserFromRequest/withMerchant/…) — güvenlik")
-    elif g in ("api", "public") and TOKEN_LOAD.search(t) and not DELETED_CHECK.search(t):
+    tx = expanded(p)
+    if g == "api" and not auth_markers.search(tx):
+        touches_merchant = re.search(r"AuthTokenManager|getIkas\(|merchantId|authorizedAppId|prisma\.(?!\$queryRaw)\w+\.(find|update|delete|create|upsert)", tx)
+        operator_token = re.search(r"timingSafeEqual", tx) and re.search(r"authorization", tx, re.I) and re.search(r"process\.env\.\w*(TOKEN|SECRET|KEY)", tx)
+        if operator_token:
+            add("§5.1", "BILGI", p, 1, "No app-JWT check; gated by an operator bearer token compared with timingSafeEqual — operational endpoint, not a merchant route. Confirm it is disabled when the token env is unset")
+        elif not touches_merchant:
+            add("§5.1", "BILGI", p, 1, "No JWT check and no merchant data visible (health check / static?) — confirm it exposes nothing merchant-specific")
+        else:
+            add("§5.1", "BLOCKER", p, 1, "Admin API route has no JWT verification marker (getUserFromRequest/withMerchant/…) and touches merchant data — güvenlik")
+    elif g in ("api", "public") and TOKEN_LOAD.search(t) and not DELETED_CHECK.search(auth_expanded(p)):
         routes_self_loading.append(rel_route(p))
 if routes_self_loading or wrappers_without_deleted:
     parts = []
@@ -306,8 +456,9 @@ for p, t in app_files.items():
     if not is_route(p):
         continue
     g = route_group(p)
-    if g == "api" and re.search(r"(body|json|searchParams)[^\n]*(authorizedAppId|merchantId)", t):
-        add("§5.1", "UYARI", p, line_of(t, r"(body|json|searchParams)[^\n]*(authorizedAppId|merchantId)"), "authorizedAppId/merchantId read from request input — must come from the verified JWT (Blocker güvenlik if input wins)")
+    INPUT_ID = r"\b(body|payload|input|parsed\.data|params|query)\.(authorizedAppId|merchantId)\b|searchParams\.get\(['\"](authorizedAppId|merchantId)['\"]\)"
+    if g == "api" and re.search(INPUT_ID, t):
+        add("§5.1", "UYARI", p, line_of(t, INPUT_ID), "authorizedAppId/merchantId read from request input — must come from the verified JWT (Blocker güvenlik if input wins)")
     if re.search(r"gql`|graphql`|query\s*\{|mutation\s*\{", t) and g in ("api", "action"):
         add("§5.3", "UYARI", p, line_of(t, r"gql`|graphql`|query\s*\{|mutation\s*\{"), "Inline GraphQL document in a route handler (§10 #11)")
     if g == "api" and re.search(r"(capture|debug|test|echo|dump)", r) and re.search(r"appendFileSync|writeFileSync|console\.log\([^)]*headers", t):
@@ -330,13 +481,18 @@ for p, t in files.items():
 MUTATION_MARKERS = re.compile(r"AuthTokenManager\.(put|delete|update)|Manager\.(delete|update|put|create|upsert|markDeleted|markProcessed)|prisma\.\w+\.(update|delete|create|upsert|deleteMany|updateMany)|db\.(insert|update|delete)|mutations\.\w+\(|deleted\s*[:=]\s*true|unlink|appendFileSync|writeFileSync")
 signed_inputs = [p for p, t in app_files.items() if is_route(p) and route_group(p) in ("webhook", "action")]
 for p in signed_inputs:
-    t = files[p]
+    t = route_text(p)
+    tx = expanded(p)
     g = route_group(p)
     sec = "§6.1" if g == "webhook" else "§7.2"
-    statuses = set(re.findall(r"status:\s*(\d{3})", t))
-    verifies = bool(re.search(r"validateIkasWebhookSignature|getParsedIkasWebhookData|validateIkasWebhookMiddleware|createHmac", t))
+    statuses = set(re.findall(r"status:\s*(\d{3})", tx)) | set(re.findall(r"WebhookError\([^)]*,\s*(\d{3})\)|errorResponse\([^)]*,\s*(\d{3})", tx) and [x for tup in re.findall(r"WebhookError\([^)]*,\s*(\d{3})\)|errorResponse\([^)]*,\s*(\d{3})", tx) for x in tup if x])
+    if re.search(r"readonly status = (\d{3})|status = 400", tx):
+        statuses.add("400")
+    SIG_RE = r"validateIkasWebhookSignature|getParsedIkasWebhookData|validateIkasWebhookMiddleware|createHmac"
+    verifies = bool(re.search(SIG_RE, tx))
+    where = via(p, SIG_RE) if verifies else ""
     rejects = bool({"401", "403"} & statuses)
-    mutates = bool(MUTATION_MARKERS.search(t))
+    mutates = bool(MUTATION_MARKERS.search(tx))
     problems = []
     if not verifies:
         problems.append("no HMAC signature check")
@@ -344,7 +500,7 @@ for p in signed_inputs:
         problems.append("signature computed but no 401/403 path — result never enforced")
     if statuses <= {"200"}:
         problems.append("only ever returns 200")
-    if re.search(r"catch[^{]*\{[^}]*status:\s*200|catch[^{]*\{[^}]*ok:\s*true", t, re.S):
+    if re.search(r"catch[^{]*\{[^}]*status:\s*200|catch[^{]*\{[^}]*ok:\s*true", tx, re.S):
         problems.append("catch block answers 200/ok")
     if problems:
         if g == "action":
@@ -354,31 +510,52 @@ for p in signed_inputs:
         else:
             sev, why = "UYARI", "handler only logs (starter payment example does the same) — still verify before extending it"
         add(sec, sev, p, 1, f"{g} route: " + "; ".join(problems) + f" — {why} (F1)")
-    if verifies and "500" not in statuses:
-        add(sec, "UYARI", p, 1, "No 500 path — processing failures and a missing CLIENT_SECRET cannot be signalled to ikas retry")
-    if not re.search(r"z\.object|zod|yup|valibot|safeParse", t):
+    elif verifies:
+        add(sec, "BILGI", p, 1, f"Signature verified before work, 401 on mismatch{where} — confirm the guard runs before any state change")
+    if verifies and not any(s.startswith("5") for s in statuses):
+        add(sec, "UYARI", p, 1, "No 5xx path — processing failures and a missing CLIENT_SECRET cannot be signalled to ikas retry")
+    if not re.search(r"z\.object|zod|yup|valibot|safeParse", tx):
         add(sec, "UYARI", p, 1, "Payload shape not validated with a schema before use")
-    if verifies and not re.search(r"clientSecret|CLIENT_SECRET", t):
+    if verifies and not re.search(r"clientSecret|CLIENT_SECRET", tx):
         add(sec, "UYARI", p, 1, "HMAC present but no visible secret reference — check fail-closed behaviour (SDK helper silently uses '' when the secret is unset)")
     if re.search(r"appendFileSync|writeFileSync", t) and re.search(r"signature|headers", t):
         add("§8", "BLOCKER", p, line_of(t, r"appendFileSync|writeFileSync"), "Webhook body/signature/headers written to disk (§10 #19) — güvenlik")
     if g == "webhook":
-        if not re.search(r"store/app/deleted|store/app/uninstalled|store/authorizedApp/deleted|uninstall", t, re.I):
-            add("§6.2", "BILGI", p, 1, "Webhook route does not match the uninstall scope (store/app/deleted) — is uninstall handled elsewhere?")
-        elif "store/app/deleted" not in t:
-            add("§6.2", "UYARI", p, line_of(t, r"uninstall|authorizedApp/deleted"), "Official uninstall scope 'store/app/deleted' [sdk: WebhookScope] is not in the matched list")
-        if re.search(r"store/app/deleted|uninstall", t, re.I) and re.search(r"if\s*\(\s*!\s*authToken\s*\)", t) and not re.search(r"authToken\??\.deleted", t):
-            add("§6.2", "UYARI", p, line_of(t, r"if\s*\(\s*!\s*authToken\s*\)"), "Uninstall handler short-circuits on missing token but not on an already-deleted one — second delivery re-runs cleanup with a dead token (F11)")
-        if not re.search(r"markProcessed|dedupe|duplicate|processedAt|webhookEvent|idempot", t, re.I):
+        UNINSTALL_RE = r"store/app/deleted|store/app/uninstalled|store/authorizedApp/deleted|WebhookScope\.APP_DELETED"
+        handles = lambda q: re.search(UNINSTALL_RE, expanded(q)) or re.search(r"uninstall", route_text(q), re.I)
+        handled_elsewhere = any(handles(q) for q in signed_inputs if q != p and route_group(q) == "webhook")
+        if not handles(p):
+            if not handled_elsewhere:
+                add("§6.2", "BILGI", p, 1, "Webhook route does not match the uninstall scope (store/app/deleted) — is uninstall handled elsewhere?")
+        elif not re.search(r"store/app/deleted|WebhookScope\.APP_DELETED", tx):
+            add("§6.2", "UYARI", p, line_of(t, r"uninstall|authorizedApp/deleted") or 1, "Official uninstall scope 'store/app/deleted' [sdk: WebhookScope] is not in the matched list")
+        if re.search(r"store/app/deleted|uninstall", tx, re.I) and re.search(r"if\s*\(\s*!\s*authToken\s*\)", tx) and not re.search(r"authToken\??\.deleted", tx):
+            add("§6.2", "UYARI", p, line_of(t, r"if\s*\(\s*!\s*authToken\s*\)") or 1, "Uninstall handler short-circuits on missing token but not on an already-deleted one — second delivery re-runs cleanup with a dead token (F11)")
+        if not re.search(r"markProcessed|dedupe|duplicate|processedAt|webhookEvent|idempot", tx, re.I):
             add("§6.1", "BILGI", p, 1, "No idempotency/dedupe marker — the 3 retries will re-run the handler")
-        if re.search(r"store/app/payment|merchantAppPayment|paymentStatus", t) and "PAID" not in t:
-            sev = "BLOCKER" if mutates and not verifies else "UYARI"
-            add("§6.4", sev, p, line_of(t, r"store/app/payment|merchantAppPayment|paymentStatus"), "Payment webhook handled without checking status === 'PAID' [docs:plans] (F13)" + (" — güvenlik" if sev == "BLOCKER" else ""))
-        if re.search(r"paymentStatus|subscriptionKey", t) and "merchantAppPayment" not in t:
+        if re.search(r"store/app/payment|merchantAppPayment|paymentStatus|WebhookScope\.APP_PAYMENT", t) and "PAID" not in tx:
+            reconciles = re.search(r"getMerchantLicence|refresh\w*Licen[cs]e|reconcil", tx, re.I)
+            if reconciles:
+                add("§6.4", "BILGI", p, line_of(t, r"store/app/payment|merchantAppPayment|paymentStatus") or 1, "Payment webhook does not check status === 'PAID' but grants nothing from the payload — it triggers a getMerchantLicence reconciliation instead. Acceptable; F13 does not apply")
+            else:
+                sev = "BLOCKER" if mutates and not verifies else "UYARI"
+                add("§6.4", sev, p, line_of(t, r"store/app/payment|merchantAppPayment|paymentStatus") or 1, "Payment webhook handled without checking status === 'PAID' [docs:plans] (F13)" + (" — güvenlik" if sev == "BLOCKER" else ""))
+        if re.search(r"paymentStatus|subscriptionKey", t) and "merchantAppPayment" not in tx:
             add("§6.4", "BILGI", p, line_of(t, r"paymentStatus|subscriptionKey"), "Payment payload parsed with the older example shape (paymentStatus/subscriptionKey); docs show data.merchantAppPayment.{status,storeAppListingSubscriptionKey}")
 
 has_webhook_route = any(route_group(p) == "webhook" for p in app_files if is_route(p))
 injects = any(re.search(r"createStorefrontJSScript|saveStorefrontJSScript|createCampaign|saveWebhooks?", t) for t in files.values())
+# storefront apps: script must be added automatically at install and removed on uninstall [observed] R5
+script_files = [p for p, t in files.items() if re.search(r"mutations\.(createStorefrontJSScript|saveStorefrontJSScript)\(", t)]
+if script_files:
+    # automatic = the callback route (or a server helper it imports, 3 levels) creates the script
+    in_install_path = any(re.search(r"createStorefrontJSScript|saveStorefrontJSScript", files.get(q, ""))
+                          for p in callback_files for q in [p] + list(local_imports(p, depth=3)))
+    callers = sorted({rel_route(p) if p in app_files else os.path.relpath(p, ROOT) for p in files if p not in script_files and any(re.search(r"\b" + n + r"\b", files[p]) for n in re.findall(r"export\s+(?:async\s+)?function\s+(\w+)|export\s+const\s+(\w+)", "\n".join(files[q] for q in script_files)) for n in n if n)})
+    if not in_install_path:
+        add("§6.2", "BLOCKER", script_files[0], line_of(files[script_files[0]], r"createStorefrontJSScript|saveStorefrontJSScript"), "Storefront script is not created in the OAuth callback; callers: " + (", ".join(callers[:4]) or "none found") + " — if the dashboard installs it automatically on first load, downgrade to Bilgi; if a merchant must click, the reviewer installs, opens the storefront and sees nothing [observed] R5 (§10 #17) — review")
+    if not any(re.search(r"deleteStorefrontJSScript", expanded(p)) for p in app_files if is_route(p) and route_group(p) == "webhook"):
+        add("§6.2", "BLOCKER", script_files[0], 1, "App injects a storefront script but no webhook route calls deleteStorefrontJSScript on store/app/deleted [observed] R5 (§10 #17) — review")
 if not has_webhook_route:
     if injects:
         add("§6.2", "UYARI", None, None, "No webhook route, but the app creates storefront scripts/campaigns/webhooks — nothing removes them on uninstall and the token stays usable (§10 #17; not a documented prerequisite, starter has none)")
@@ -409,6 +586,15 @@ for p, t in files.items():
 
 # env files: tracked → Blocker; untracked and not ignored → Uyarı
 gi = read(os.path.join(ROOT, ".gitignore"))
+is_git = bool(git_state) or os.path.isdir(os.path.join(ROOT, ".git"))
+if not is_git:
+    add("§8", "BILGI", None, None, "Not a git repository — untracked/ignored state unknown; report Git as 'repo yok'")
+if not os.path.exists(os.path.join(ROOT, ".gitignore")):
+    add("§8", "UYARI", None, None, ".gitignore missing — the first `git init && git add .` commits .env* and build output (F12 precondition once a repo exists)")
+elif not re.search(r"^\s*\.env(\*|$|\s|\.)", gi, re.M):
+    add("§8", "UYARI", os.path.join(ROOT, ".gitignore"), 1, ".gitignore has no .env pattern (F12)")
+if not any(os.path.exists(os.path.join(ROOT, n)) for n in (".env.example", ".env.sample", ".env.template")):
+    add("§8", "BILGI", None, None, "No .env.example — reviewer/developer cannot see the required env contract; README should list it")
 for fn in sorted(os.listdir(ROOT)):
     if not fn.startswith(".env") or fn in (".env.example", ".env.sample", ".env.template"):
         continue
@@ -480,14 +666,18 @@ for p, t in files.items():
 ops = set()
 for t in files.values():
     ops.update(re.findall(r"\.(?:queries|mutations)\.(\w+)\(", t))
-IDENTITY_OPS = {"getMerchant", "getAuthorizedApp", "getMerchantLicence", "me"}
+IDENTITY_OPS = {"getMerchant", "getAuthorizedApp", "getMerchantLicence", "me",
+                "listMerchantAppPayment", "createMerchantAppPayment", "saveWebhooks", "deleteWebhook", "getAppDemoDay", "addCustomTimelineEntry",
+                "getSalesChannel", "updateSalesChannel", "getGlobalTaxSettings", "listShippingSettings", "listTaxSettings",
+                "listCountry", "listState", "listCity", "listDistrict", "listTown"}  # [mcp] no scope family
 # §11 — operation-name keyword → scope family (heuristic; only zero-operation families are flagged)
 FAMILY = {
     "order": "orders", "package": "orders", "fulfil": "orders", "shipment": "orders",
     "product": "products", "variant": "products", "category": "products", "brand": "products", "vendor": "products", "tag": "products", "attribute": "products",
     "customer": "customers", "address": "customers",
     "campaign": "campaigns", "coupon": "campaigns", "discount": "campaigns", "promotion": "campaigns",
-    "stock": "inventories", "inventor": "inventories",
+    "stock": "inventories", "inventor": "inventories", "variantstock": "inventories",
+    "abandonedcheckout": "orders", "fulfil": "orders", "transaction": "orders", "invoice": "orders",
     "storefront": "storefronts", "script": "storefronts", "theme": "storefronts",
 }
 used_families = {}
@@ -513,10 +703,17 @@ if scope_decl:
             need = "write_storefronts" if fam == "storefronts" else f"read_{fam}/write_{fam}"
             add("§2.1", "UYARI", p, line_of(files[p], r"REQUIRED_SCOPES|scope"), f"{', '.join(sorted(fam_ops))} called but no {fam} scope ({need}) is requested — the call fails with a permission error at runtime (işlevsel; verify against the Partner-panel scope list)")
 if has_webhook_route and not any(re.search(r"mutations\.saveWebhooks?\(", t) for t in files.values()):
-    add("§6.2", "BILGI", None, None, "Webhook route exists but saveWebhooks is never called — endpoint must be registered in the Partner panel (add a DECLARE row)")
+    DATA_SCOPES = r"store/(order|product|customer|customerFavoriteProducts|stock)/"
+    data_routes = [rel_route(p) for p in signed_inputs if route_group(p) == "webhook" and re.search(DATA_SCOPES, expanded(p))]
+    if data_routes:
+        add("§6.2", "UYARI", None, None, "Webhook route handles data scopes (" + ", ".join(data_routes) + ") but saveWebhooks is never called — [mcp] data scopes can only be registered with saveWebhooks; the Partner-panel Bildirim Adresi delivers only store/app/deleted and store/app/payment")
+    else:
+        add("§6.2", "BILGI", None, None, "Webhook route handles lifecycle scopes only — [partner-panel] register it as Konfigürasyon › Bildirim Adresi (DECLARE row); saveWebhooks is not needed")
 
 # ---------------------------------------------------------------- output
 ORDER = {"BLOCKER": 0, "UYARI": 1, "BILGI": 2}
+if SECTION_FILTER:
+    findings = [f for f in findings if f["section"].startswith(SECTION_FILTER) or f["section"].startswith("§10")]
 findings.sort(key=lambda f: (ORDER[f["severity"]], f["section"], f["file"], f["line"] or 0))
 
 if AS_JSON:
@@ -524,9 +721,9 @@ if AS_JSON:
         f["git"] = git_tag(os.path.join(ROOT, f["file"])).strip(" []") if f["file"] != "-" else ""
     print(json.dumps({"root": ROOT, "findings": findings}, indent=2, ensure_ascii=False))
 else:
-    print(f"ikas-app-preflight scan — {ROOT}")
+    print(f"ikas-app-preflight scan — {ROOT}" + (f" — section {_sec}" if _sec else ""))
     print(f"sdk={'yes' if has_sdk else 'no'} app-helpers={'yes' if has_bridge else 'no'} ikas.config.json={'yes' if has_cfg else 'no'} "
-          f"routes={sum(1 for p in app_files if is_route(p))} client-pages={len(client_pages)} git={'yes' if git_state or os.path.isdir(os.path.join(ROOT, '.git')) else 'no'}"
+          f"routes={sum(1 for p in app_files if is_route(p))} client-pages={len(client_pages)} git={'yes' if is_git else 'no (repo yok)'}"
           + (f" ({git_note})" if git_note else ""))
     print()
     for f in findings:

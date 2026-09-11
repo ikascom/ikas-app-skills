@@ -1,0 +1,27 @@
+{
+  "portMapping": {
+    "default": 3000
+  },
+  "oauthRedirectPath": "/api/oauth/callback/ikas",
+  "runCommand": "pnpm run dev",
+  "actions": [
+    {
+      "name": "Sipariş listesi",
+      "method": "iframe",
+      "actionUrl": "https://example.vercel.app/actions/order-list",
+      "type": "order-list"
+    },
+    {
+      "name": "Sipariş detayı",
+      "method": "api",
+      "actionUrl": "https://example.vercel.app/api/actions/order-detail",
+      "type": "order-detail"
+    },
+    {
+      "name": "Eksik",
+      "method": "api",
+      "actionUrl": "https://example.vercel.app/api/actions/missing",
+      "type": "order-detail"
+    }
+  ]
+}
