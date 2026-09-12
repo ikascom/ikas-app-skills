@@ -2,7 +2,25 @@
 
 The report is written **in Turkish** regardless of the language of SKILL.md, unless the user asks for another language. Use exactly these sections, in this order. Omit a section only when it is empty **and** say so in one line (e.g. "Blocker yok."). Keep prose short.
 
-**The report is read in a terminal.** Wide markdown tables are re-flowed into unreadable key/value walls there, so findings (sections 1–2) are **blocks**, not tables: a bold header line, then `Bulgu` / `Kanıt` lines. Only the two-column Beyan table stays a table. Bilgi and Kontrat dışı are one-line bullets — one fact per bullet, path first.
+**The report is read in a terminal by a developer who has never opened app-review.md.** Three consequences:
+
+1. **What to do comes first.** The action list sits right under Karar; the detailed sections justify it below.
+2. **Plain names before § numbers.** Every finding header starts with the area in Turkish, the § in parentheses: `OAuth callback (§2.2)`. Never a bare `§2.2`. Area names:
+
+   | § | Alan adı |
+   |---|---|
+   | §1 | Yayın ön koşulları |
+   | §2.1 / §2.2 / §2.3 | OAuth başlatma / OAuth callback / Token yenileme |
+   | §3 | Panel içi yükleme (App Bridge) |
+   | §4 | Panel ekranı |
+   | §5 | Backend API (JWT) |
+   | §6.1 / §6.2 / §6.4 | Webhook imzası / Kaldırma / Ödeme |
+   | §7 | Aksiyonlar |
+   | §8 | Gizli anahtarlar ve ayar |
+   | §9 | Storefront uçları |
+   | §10 #n | Bilinen hata kalıbı #n |
+
+3. **Blocks, not wide tables** (the terminal re-flows tables into key/value walls). Only the two-column "kod dışında" table stays a table. Bilgi and öneri bullets are one line each, path first.
 
 ## Contents
 
@@ -19,37 +37,41 @@ The report is written **in Turkish** regardless of the language of SKILL.md, unl
 **Uygulama şekli:** §4 (a|b|c|d) <kısa açıklama> · **Plan:** ücretsiz | ücretli
 **Mod:** tam | quick | section <alan> · **Scanner:** <n> route, <n> client page · **Git:** temiz | <n> untracked | commit yok | repo yok
 
-## 0. Bir bakışta
-<3–6 madde, teknik olmayan biri için: uygulama ne yapıyor; kurulum/kaldırma/webhook/aksiyon güvenliği ne durumda; göndermeden önce yapılması gereken 1–3 şey; kod dışında kapatılması gereken beyanlar. Madde başına bir cümle, § referansı yok.>
+## Bir bakışta
+<3–6 madde, teknik olmayan biri için: uygulama ne yapıyor; kurulum/kaldırma/webhook/aksiyon güvenliği ne durumda; göndermeden önce yapılması gereken 1–3 şey; kod dışında kapatılması gereken beyanlar. Madde başına bir cümle, § yok.>
+
+## Yapılacaklar (öncelik sırasıyla)
+1. **`dosya:satır`** — somut değişiklik, tek cümle → B1 · katalogda F<n> var / elle
+2. **`dosya`** — … → U1 · elle
+3. **Partner paneli** — … → kod dışında
+<Blocker'lar önce, sonra Uyarılar, sonra kod dışı işler. Her madde: nerede, ne değişecek, hangi bulguya bağlı, katalogda hazır tarif var mı.>
 
 ## 1. Blocker'lar
-**B1 · güvenlik · §6.1, §10 #2 `[security]`**
+**B1 · güvenlik · Webhook imzası (§6.1, §10 #2) `[security]`**
 Bulgu: <tek cümle, ne yanlış>
 Kanıt: `dosya:satır` — ne görüldü (untracked/gitignored ise belirt)
+Düzeltme: <tek cümle, ne yapılacak>
 
-**B2 · işlevsel · §3.1 `[observed]` R2**
+**B2 · işlevsel · Panel içi yükleme (§3.1) `[observed]` R2**
 …
 
 ## 2. Uyarılar
-**U1 · §2.1, §10 #16 `[docs:admin-app]`**
+**U1 · OAuth başlatma (§2.1, §10 #16) `[docs:admin-app]`**
 Bulgu: …
 Kanıt: `dosya:satır` — …
+Düzeltme: …
 
-## 3. Beyan gerekli
+## 3. Kod dışında doğrulanacaklar
 | Soru | Neden |
 |---|---|
-| Partner hesabı oluşturuldu ve uygulama bu hesaba eklendi mi? | §1 #1 |
+| Partner hesabı oluşturuldu ve uygulama bu hesaba eklendi mi? | Yayın ön koşulu (§1 #1) |
 | … | … |
 
-## 4. Bilgi
-- `dosya:satır` — tek satır, tek gerçek (temiz alan kanıtı; birleştirilen/düşürülen scanner hit'i ve § gerekçesi)
+## 4. Temiz alanlar ve notlar
+- `dosya:satır` — tek satır, tek gerçek (temiz alan kanıtı; birleştirilen/düşürülen scanner hit'i ve gerekçesi)
 
-## 5. Kontrat dışı (zorunlu değil, en fazla 5)
+## 5. İsteğe bağlı öneriler (kural gerektirmiyor, en fazla 5)
 - …
-
-## 6. Öncelikli aksiyon listesi
-1. **`dosya`** — somut değişiklik (B1)
-2. …
 
 ## 7. Uygulanan düzeltmeler   ← only after the user approved fixes
 - **F1** `src/app/api/webhooks/ikas/route.ts` — imza doğrulaması + 401/500 yolu eklendi
@@ -62,10 +84,11 @@ Uygulanmayanlar: F4 — ön koşul sağlanmadı (config zaten normalize ediyor)
 
 ## Column rules
 
-- **Header line** — `**B1 · <neden> · <§ ve kaynak etiketi>**` for Blockers, `**U1 · <§ ve kaynak etiketi>**` for Uyarılar. Neden is exactly one of `güvenlik`, `review`, `işlevsel` (app-review.md §0). Source tags: `[docs:…]`, `[sdk]`, `[partner-panel]`, `[mcp]`, `[security]`, `[observed] R<n>` (cite the rejection number). A finding with no § is **kontrat dışı** and goes to section 5.
+- **Header line** — `**B1 · <neden> · <Alan adı> (<§>) <kaynak etiketi>**` for Blockers, `**U1 · <Alan adı> (<§>) <kaynak etiketi>**` for Uyarılar; area names from the table above. Neden is exactly one of `güvenlik`, `review`, `işlevsel` (app-review.md §0). Source tags: `[docs:…]`, `[sdk]`, `[partner-panel]`, `[mcp]`, `[security]`, `[observed] R<n>` (cite the rejection number). A finding with no § is **kontrat dışı** and goes to section 5.
 - **Bulgu** — one sentence, what is wrong, no "should consider".
 - **Kanıt** — `path:line` plus what you saw there, enough to verify without re-auditing. Quote the scanner line when it *is* the evidence. Mark files that are `untracked` or `gitignored` (`git status --porcelain --ignored`) — they are still in the working tree and will ship if deployed from it.
-- **Length** — Bulgu ≤ 1 line, Kanıt ≤ 2 lines, every Bilgi bullet ≤ 1 line. Long reasoning goes nowhere; the evidence column is what the developer opens.
+- **Düzeltme** — one sentence, imperative, concrete ("`state` karşılaştırmasını `state && session.state` koşuluna al"). Same text feeds the Yapılacaklar list.
+- **Length** — Bulgu ≤ 1 line, Kanıt ≤ 2 lines, Düzeltme ≤ 1 line, every note bullet ≤ 1 line. Long reasoning goes nowhere; the evidence column is what the developer opens.
 - **Bir bakışta** — plain Turkish for the developer's manager or the reviewer contact; no §, no file paths, no severity jargon. It summarises, never adds a finding that is not in sections 1–3.
 - **Karar** — honest. "Şu iki düzeltmeyle gönderilebilir" is fine when the Blockers are each a small, obvious change. With no Blocker: "Bu kural setine göre Blocker kalmadı; en yüksek öncelikli uyarı: …" (name one). Never say "review'dan geçer".
 - Sort: Blockers — güvenlik first, then review, then işlevsel. Uyarılar — by §.
@@ -80,47 +103,52 @@ Uygulanmayanlar: F4 — ön koşul sağlanmadı (config zaten normalize ediyor)
 **Uygulama şekli:** §4 (a) panel içi dashboard · **Plan:** ücretsiz
 **Mod:** tam · **Scanner:** 16 route, 6 client page · **Git:** 1 untracked
 
-## 0. Bir bakışta
+## Bir bakışta
 - Rush, mağazaya kampanya ve widget ekleyen panel içi bir uygulama; kurulum ve giriş akışı çalışıyor.
 - Çalışma ağacında imzasız bir test webhook route'u var; silinmeden gönderilmemeli.
 - Bir admin route'u kaldırılmış mağazaların token'ını reddetmiyor; tek satırlık düzeltme.
 - Partner panelinde 4 fazla izin ve uninstall webhook kaydı kontrol edilmeli.
 
+## Yapılacaklar (öncelik sırasıyla)
+1. **`src/app/api/webhooks/capture/`** — dizini sil; `.env`'den `WEBHOOK_CAPTURE_*` çıkar → B1 · elle
+2. **`src/app/api/oauth/callback/ikas/route.ts`** — token kaydından sonra `installScript` çağır → B2 · elle
+3. **`src/app/api/ikas/get-merchant/route.ts`** — `withMerchant` ile sar → U2 · katalogda F10 var
+4. **`src/globals/config.ts`** — kullanılmayan 4 scope'u çıkar, Partner panelini eşle → U1 · elle (re-authorize gerektirir)
+5. **Partner paneli** — Bildirim Adresi'ni `<deployUrl>/api/webhooks/ikas` yap; 2 dev mağazayı İzin Verilen Mağazalar'a ekle → kod dışında
+
 ## 1. Blocker'lar
-**B1 · güvenlik · §6.1, §10 #2, #19 `[security]`**
+**B1 · güvenlik · Webhook imzası (§6.1, §10 #2, #19) `[security]`**
 Bulgu: Webhook route imza hesaplıyor ama reddetmiyor, koşulsuz 200 dönüyor, imza+header'ları diske yazıyor.
 Kanıt: `src/app/api/webhooks/capture/route.ts:28-58` — `signatureValid` kullanılmıyor, `appendFileSync(...signature...)`, `return { ok: true }`; dosya **untracked**.
+Düzeltme: Dizini sil; test için gerekiyorsa aynı imza zincirinin arkasına al.
 
-**B2 · review · §6.2, §10 #17 `[observed]` R5**
+**B2 · review · Kaldırma / storefront script (§6.2, §10 #17) `[observed]` R5**
 Bulgu: Storefront script kurulumda otomatik eklenmiyor; yalnızca ayarlar düğmesi ve kampanya publish ile.
 Kanıt: `src/lib/storefront-script.ts:68` `installScript` — çağıranlar `api/ikas/script`, `campaigns/[id]/publish`; callback'te yok.
+Düzeltme: Callback'te token kaydedildikten sonra `installScript` çağır; reviewer kurunca vitrinde script'i görmeli.
 
 ## 2. Uyarılar
-**U1 · §2.1, §10 #16 `[docs:admin-app]`**
+**U1 · OAuth başlatma (§2.1, §10 #16) `[docs:admin-app]`**
 Bulgu: `read_orders`, `write_orders`, `read_inventories`, `write_inventories` isteniyor; hiçbir orders/inventory operasyonu çağrılmıyor.
 Kanıt: `src/globals/config.ts:2-6`; operasyonlar: createCampaign, searchProduct, listStorefront…
+Düzeltme: 4 scope'u çıkar; Partner panel › Uygulama Yetkileri'ni aynı listeye indir (mevcut kurulumlar yeniden yetki ister).
 
-**U2 · §5.1 `[security]`**
+**U2 · Backend API (§5.1) `[security]`**
 Bulgu: `get-merchant` route'u `withMerchant` dışında, `deleted` kontrolü yok.
 Kanıt: `src/app/api/ikas/get-merchant/route.ts:18`
+Düzeltme: Handler'ı `withMerchant` ile sar (F10).
 
-## 3. Beyan gerekli
+## 3. Kod dışında doğrulanacaklar
 | Soru | Neden |
 |---|---|
-| Partner hesabı doğrulandı mı? | §1 #2 |
-| Uygulama en az 2 geliştirme mağazasında kurulu mu? Mağaza adları? | §1 #5 |
-| Uninstall webhook'u Partner panelinde `<deployUrl>/api/webhooks/ikas` için `store/app/deleted` ile tanımlı mı? (kod `saveWebhooks` çağırmıyor) | §6.2 |
+| Partner hesabı doğrulandı mı? | Yayın ön koşulu (§1 #2) |
+| Uygulama en az 2 geliştirme mağazasında kurulu mu? Partner panel › İzin Verilen Mağazalar'daki adlar? | Yayın ön koşulu (§1 #5), ret R7 |
+| Partner panel › Bildirim Adresi `<deployUrl>/api/webhooks/ikas` mi? (`store/app/deleted` yalnız oradan gelir) | Kaldırma (§6.2) |
 
-## 4. Bilgi
-- `api/oauth/callback/ikas/route.ts:46-60` — signature varsa doğrulanıyor, state varsa eşleniyor ve siliniyor; tarayıcıya yalnız 4 saatlik JWT (§2.2 temiz).
-- `public/widget.js:12` — `api.myikas.com/api/sf/graphql` anonim çağrı → §5.2 muaf; README'de belirtilmeli.
+## 4. Temiz alanlar ve notlar
+- `api/oauth/callback/ikas/route.ts:46-60` — signature varsa doğrulanıyor, state varsa eşleniyor ve siliniyor; tarayıcıya yalnız 4 saatlik JWT (OAuth callback temiz).
+- `public/widget.js:12` — `api.myikas.com/api/sf/graphql` anonim çağrı → Backend API kuralından muaf; README'de belirtilmeli.
 
-## 5. Kontrat dışı (zorunlu değil)
+## 5. İsteğe bağlı öneriler
 - `rate-limit.ts` instance-başı; serverless'ta paylaşımlı store düşünülebilir.
-
-## 6. Öncelikli aksiyon listesi
-1. **`src/app/api/webhooks/capture/`** — dizini sil; `.env`'den `WEBHOOK_CAPTURE_*` çıkar (B1)
-2. **`src/app/api/oauth/callback/ikas/route.ts`** — token kaydından sonra `installScript` çağır (B2)
-3. **`src/app/api/ikas/get-merchant/route.ts`** — `withMerchant` ile sar (U2, F10)
-4. **`src/globals/config.ts`** — kullanılmayan 4 scope'u çıkar, Partner panelini eşle (U1)
 ```

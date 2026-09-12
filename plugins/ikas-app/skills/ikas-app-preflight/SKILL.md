@@ -85,7 +85,7 @@ Read app-review.md §10 and check items #1–#19 explicitly. Cite as `§10 #n`; 
 
 ### Step 5 — Report
 
-Write the report in Turkish following `references/report-template.md` exactly: Karar → Bir bakışta → Blocker'lar → Uyarılar → Beyan gerekli → Bilgi → Kontrat dışı (max 5) → Öncelikli aksiyon listesi. Findings are **blocks, not wide tables** (the terminal re-flows tables into unreadable key/value walls); Bilgi bullets are one line each. Evidence = `path:line` + what you saw. Grade SHOULD rules by the severity the ruleset names (most are Bilgi, not kontrat dışı — kontrat dışı is only for advice no § covers). End with one line: the report can be saved as `PREFLIGHT-REPORT.md` in the project root on request (do not write it unasked — Steps 1–5 change nothing). Build the Beyan table from §1 and the app shape:
+Write the report in Turkish following `references/report-template.md` exactly: Karar → Bir bakışta → **Yapılacaklar** (the action list, first) → Blocker'lar → Uyarılar → Kod dışında doğrulanacaklar → Temiz alanlar ve notlar → İsteğe bağlı öneriler (max 5). Every finding header names the area in Turkish before the § (`OAuth callback (§2.2)`); every finding has a one-line `Düzeltme:`. Findings are **blocks, not wide tables** (the terminal re-flows tables into unreadable key/value walls); Bilgi bullets are one line each. Evidence = `path:line` + what you saw. Grade SHOULD rules by the severity the ruleset names (most are Bilgi, not kontrat dışı — kontrat dışı is only for advice no § covers). End with one line: the report can be saved as `PREFLIGHT-REPORT.md` in the project root on request (do not write it unasked — Steps 1–5 change nothing). Build the Beyan table from §1 and the app shape:
 
 | Soru | Neden |
 |---|---|
@@ -106,12 +106,17 @@ Write the report in Turkish following `references/report-template.md` exactly: K
 
 ### Step 6 — Ask, then fix
 
-After the report, if any finding matches a recipe in `references/fix-catalogue.md`, ask with AskUserQuestion (in Turkish):
+**Always ask after the report** (AskUserQuestion, in Turkish) — a report with no offer to help reads as "figure it out yourself". Two cases:
 
+**Some finding matches a recipe in `references/fix-catalogue.md`:**
 - Question: "Rapordaki bulgular için katalogdaki düzeltmeleri uygulayayım mı?"
 - Options: **"Evet, hepsini uygula (Recommended)"** — every recipe whose precondition holds · **"Sadece Blocker'ları düzelt"** · **"Seçeyim"** — then list the applicable `F<n>` ids and ask which · **"Hayır, rapor yeter"**
+- On yes: read the catalogue, apply only the selected recipes exactly as written, run the type-check when `node_modules` exists (do not install), then append section 7 of the template: applied fixes, type-check result, `git diff --stat`, recipes not applied with reasons. Never commit.
 
-If nothing matches a recipe, say so and stop. On yes: read `references/fix-catalogue.md`, apply only the selected recipes exactly as written, run the type-check when `node_modules` exists (do not install), then append section 7 of the template: applied fixes, type-check result, `git diff --stat`, and the recipes not applied with reasons. Never commit.
+**No recipe matches (or the recipes are done and hand-work remains):**
+- Question: "Katalogda hazır tarif kalmadı. Yapılacaklar listesindeki kod değişikliklerini tek tek, her birini göstererek uygulayayım mı?"
+- Options: **"Evet, sırayla uygula (Recommended)"** · **"Seçeyim"** — list the Yapılacaklar items that are code changes · **"Hayır, ben yaparım"**
+- On yes: for each selected item, show the intended change in one sentence, make the minimal edit in the named file, and move on; re-run the scanner at the end and report what changed (`git diff --stat` or the file list when there is no repo). Items in the catalogue's "Never do" list (scope trimming, OAuth flow rewrites, `|| ''` env contracts, public-schema field drops, deleting routes) are **still offered** here but with their caveat stated in the option text, and each one is confirmed individually before editing. Partner-panel / declaration items are never "applied" — they stay listed as the developer's job.
 
 ## Common mistakes
 
