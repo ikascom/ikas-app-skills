@@ -1,5 +1,9 @@
 {
   "name": "ikas-app",
   "version": "0.3.0",
-  "description": "ikas Admin App (uygulama) geliştirme skill'leri"
+  "description": "ikas Admin App (uygulama) geliştirme skill'leri",
+  "author": {
+    "name": "ikas",
+    "url": "https://github.com/ikascom"
+  }
 }

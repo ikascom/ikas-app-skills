@@ -9,5 +9,6 @@
       "source": "./plugins/ikas-app",
       "description": "ikas Admin App (uygulama) geliştirme skill'leri"
     }
-  ]
+  ],
+  "description": "ikas Admin App geliştirme skill'leri — App Store review öncesi denetim ve düzeltme"
 }
