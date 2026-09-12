@@ -85,7 +85,7 @@ Read app-review.md §10 and check items #1–#19 explicitly. Cite as `§10 #n`; 
 
 ### Step 5 — Report
 
-Write the report in Turkish following `references/report-template.md` exactly: Karar → Bir bakışta → Blocker'lar → Uyarılar → Beyan gerekli → Bilgi → Kontrat dışı (max 5) → Öncelikli aksiyon listesi. Evidence = `path:line` + what you saw. Build the Beyan table from §1 and the app shape:
+Write the report in Turkish following `references/report-template.md` exactly: Karar → Bir bakışta → Blocker'lar → Uyarılar → Beyan gerekli → Bilgi → Kontrat dışı (max 5) → Öncelikli aksiyon listesi. Findings are **blocks, not wide tables** (the terminal re-flows tables into unreadable key/value walls); Bilgi bullets are one line each. Evidence = `path:line` + what you saw. Grade SHOULD rules by the severity the ruleset names (most are Bilgi, not kontrat dışı — kontrat dışı is only for advice no § covers). End with one line: the report can be saved as `PREFLIGHT-REPORT.md` in the project root on request (do not write it unasked — Steps 1–5 change nothing). Build the Beyan table from §1 and the app shape:
 
 | Soru | Neden |
 |---|---|
