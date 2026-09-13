@@ -67,7 +67,7 @@ Open `references/app-review.md` with Read and grade section by section; do not g
 |---|---|---|
 | Kurulum | authorize → callback → token stored → JWT to browser | §2.1, §2.2 |
 | Callback sayfası | `closeLoader`, `<Suspense>`, iframe branch, sentinel | §3.1, §3.3 |
-| Günlük giriş | entry page closes loader, bridge token, something actionable renders, non-iframe fallback | §3.1, §3.2, §4 |
+| Günlük giriş | entry page closes loader, bridge token, something actionable renders, non-iframe fallback; what happens when the bridge token exists but the backend has no ikas token for it (§10 #23) | §3.1, §3.2, §4, §2.2 |
 | ikas arayüzü | the §4 row for the shape holds | §4 |
 | Aksiyon | iframe: params, loader, result, `closeApp`; API: HMAC first | §7 |
 | Plan (paid) | `PAID` only, key mapping, `getMerchantLicence` gating | §6.4 |
@@ -81,7 +81,7 @@ For facts you are unsure about (an operation name, an argument type, a webhook s
 
 ### Step 4 — Anti-pattern sweep
 
-Read app-review.md §10 and check items #1–#22 explicitly (#7 is retired). Cite as `§10 #n`; when an item is also a §2–§9 rule, cite both.
+Read app-review.md §10 and check items #1–#23 explicitly (#7 is retired). Cite as `§10 #n`; when an item is also a §2–§9 rule, cite both.
 
 ### Step 5 — Report
 

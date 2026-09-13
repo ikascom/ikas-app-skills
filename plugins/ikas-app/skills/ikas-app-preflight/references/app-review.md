@@ -322,6 +322,7 @@ Numbered so findings can cite them. Severity here is the default; §2–§9 word
 | 20 | Callback requires `state` / an app session (`if (!state)`, "install link expired", `error=missing_code`) | Admin-initiated install arrives with `code`+`storeName` only → every reviewer install fails | `state && session.state && …` | Blocker (işlevsel) | §2.2 `[observed]` R4, R1 |
 | 21 | External UI does not recognise the merchant after an Admin install (manual "connect ikas" step) | Reviewer sees integration "bağlanmadı" | Bind token → tenant in the callback | Blocker (işlevsel) | §2.2 `[observed]` R3 |
 | 22 | App is a contact/marketing shell with no standalone function | Rejected as not a product | — (product decision; report it) | Blocker (review) | §1 `[observed]` R6 |
+| 23 | Root treats a bridge JWT as proof of install and pushes to `/dashboard`; backend has no ikas token for that `authorizedAppId` | Dev-mode / CLI installs land on 404s and never start OAuth | Check the backend token for `aud`; otherwise start authorize from the top window | Uyarı (`[starter]` does it) | §2.2 `[observed]` E1 |
 | 18 | Client component or widget calling the ikas Admin API | Requires shipping an ikas token to the browser | Route through the backend | Blocker (güvenlik) | §5.2 |
 | 19 | Test/debug route left in the tree (captures bodies to disk, echoes signatures, always 200) | Open unauthenticated endpoint in production | Delete or gate behind the same signature chain | Blocker (güvenlik) | §6.1, §8 `[observed]` |
 
