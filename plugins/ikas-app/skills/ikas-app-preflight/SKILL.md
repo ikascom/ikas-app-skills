@@ -71,7 +71,7 @@ Open `references/app-review.md` with Read and grade section by section; do not g
 | ikas arayüzü | the §4 row for the shape holds | §4 |
 | Aksiyon | iframe: params, loader, result, `closeApp`; API: HMAC first | §7 |
 | Plan (paid) | `PAID` only, key mapping, `getMerchantLicence` gating | §6.4 |
-| Kaldırma | signature → secret guard → statuses → Admin API cleanup (`deleteStorefrontJSScript`, campaigns, best-effort `deleteWebhook`) → token invalidated → routes refuse the dead token. No webhook route at all → one §6.2 Uyarı (priority 1 if the app injects scripts/campaigns) plus the Partner-panel Beyan row; do not repeat it per route. `saveWebhooks` without `deleteWebhook` is **Bilgi** (§6.2) unless the data route skips the installation-status check | §6.1, §6.2, §5.1 |
+| Kaldırma | signature → secret guard → statuses → Admin API cleanup (`deleteStorefrontJSScript`, campaigns, best-effort `deleteWebhook`) → token invalidated → routes refuse the dead token. No webhook route at all → one §6.2 Uyarı (priority 1 if the app injects scripts/campaigns) plus the Partner-panel Beyan row; do not repeat it per route. `saveWebhooks` without `deleteWebhook` is **not a finding** (§6.2 `[observed]` E1: ikas drops the registrations itself); the token is **not** revoked by ikas, so local invalidation + §5.1 `deleted` check is the real control | §6.1, §6.2, §5.1 |
 
 Then the security layer against the inventory: every non-exempt route verifies the JWT before work and takes identity from `aud`/`sub` (§5.1); no client → Admin API (§5.2); webhooks and API actions verify before acting, fail closed, honest statuses (§6.1, §7.2); nothing secret under `NEXT_PUBLIC_`, env files ignored, no token logging, `oauthRedirectPath` matches a route (§8); public endpoints scope by merchant, take no money from the client, rate-limit writes (§9).
 
@@ -128,5 +128,5 @@ Write the report in Turkish following `references/report-template.md` exactly: K
 - Trusting scanner silence for routes. The inventory from Step 2 is the truth.
 - Applying fixes before the user answered, or applying non-catalogue fixes.
 - Saying "review'dan geçer".
-- Grading `saveWebhooks`-without-`deleteWebhook` as Uyarı, or claiming ikas keeps delivering after uninstall. Unverified; delivery stops after 3 failed retries; §6.2 says Bilgi + best-effort cleanup + a `listWebhook` DECLARE row.
+- Reporting `saveWebhooks`-without-`deleteWebhook` at all: ikas removes the registrations on uninstall (§6.2 `[observed]` E1). The opposite mistake: assuming ikas revokes the access token on uninstall — it does not (E1); the app's own `deleted` flag is what stops post-removal reads.
 - Copying a signature from MCP `introspect` into a Düzeltme without checking `schema.py`.
