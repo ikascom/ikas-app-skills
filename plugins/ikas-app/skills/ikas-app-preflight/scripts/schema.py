@@ -4,6 +4,7 @@
   python3 schema.py                      # every query/mutation with argument types
   python3 schema.py deleteWebhook        # one operation (args + return type)
   python3 schema.py WebhookInput         # one type (fields / input fields / enum values)
+  python3 schema.py --v1 saveProduct     # against /api/v1/admin/graphql (v1 and v2 are different schemas)
 
 Source of the [schema] tag in references/app-review.md. Read-only; no token, no side effects.
 """
@@ -11,7 +12,8 @@ import json
 import sys
 import urllib.request
 
-URL = "https://api.myikas.com/api/v2/admin/graphql"
+VERSION = "v1" if "--v1" in sys.argv else "v2"
+URL = f"https://api.myikas.com/api/{VERSION}/admin/graphql"
 TYPE_REF = "kind name ofType { kind name ofType { kind name ofType { kind name } } }"
 
 
@@ -40,7 +42,8 @@ def sig(f):
 
 
 def main():
-    name = sys.argv[1] if len(sys.argv) > 1 else None
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    name = args[0] if args else None
     schema = post("{ __schema { queryType { fields { name args { name type { %s } } type { %s } } } "
                   "mutationType { fields { name args { name type { %s } } type { %s } } } } }" % ((TYPE_REF,) * 4))["__schema"]
     ops = [("query", f) for f in schema["queryType"]["fields"]] + [("mutation", f) for f in schema["mutationType"]["fields"]]
@@ -61,7 +64,7 @@ def main():
         for e in t.get("enumValues") or []:
             print(f"  {e['name']}")
     if not hits and not t:
-        sys.exit(f"'{name}' is neither an operation nor a type in the live schema")
+        sys.exit(f"'{name}' is neither an operation nor a type in the live {VERSION} schema (try --v1 / without it)")
 
 
 if __name__ == "__main__":

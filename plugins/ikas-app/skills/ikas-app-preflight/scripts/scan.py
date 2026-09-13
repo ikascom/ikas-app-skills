@@ -684,6 +684,47 @@ for p, t in files.items():
 ops = set()
 for t in files.values():
     ops.update(re.findall(r"\.(?:queries|mutations)\.(\w+)\(", t))
+# ---------------------------------------------------------------- §5.3 Admin API version ↔ operation names
+# [schema] 2026-09-13: /api/v1/admin/graphql and /api/v2/admin/graphql expose DIFFERENT schemas (v1: 63 q / 69 m, v2: 47 q / 76 m).
+# Names present in exactly one version — a call to the other version's name fails with GRAPHQL_VALIDATION_FAILED at runtime.
+V1_ONLY_OPS = {"getIkasWalletWithBalance", "getImageUploadUrl", "getLastImportJobData", "getTimelineEntry", "getVideoUploadUrl", "listIkasWallet",
+               "listIkasWalletTransaction", "listLanguage", "listMerchantSettings", "listProductOptionSet", "listProductOrder", "listProductUnit",
+               "listProductVolumeDiscount", "listStorefrontJSScript", "listStorefrontPolicy", "listVendor", "searchProducts",
+               "campaignAddCoupons", "changeStockLocation", "createMerchantAppPaymentWithSubscription", "createWalletTransaction", "deleteProductOrderList",
+               "deleteProductUnitList", "deleteProductVolumeDiscountList", "deleteStorefrontPolicyList", "deleteVendorList", "generateOrderPaymentLink",
+               "getOrderInvoicePdfUrl", "saveCampaign", "saveCategory", "saveCustomer", "saveCustomerGroup", "saveCustomerTag", "saveGlobalTaxSettings",
+               "saveOrderTag", "saveProduct", "saveProductAttribute", "saveProductBrand", "saveProductOrder", "saveProductStockLocations", "saveProductTag",
+               "saveProductUnit", "saveProductVolumeDiscount", "saveSalesChannel", "saveStorefrontJSScript", "saveStorefrontPolicy", "saveTaxSettings",
+               "saveVariantPrices", "saveVendor", "saveWebhook", "updateCustomerB2BStatus", "updateOrderLine", "updateSubscriptionStatus"}
+V2_ONLY_OPS = {"getMerchantSettings", "addCouponsToCampaign", "addCustomerTimelineEntry", "addOrderTimelineEntry", "addVariantToProduct", "createCampaign",
+               "createCategory", "createCustomer", "createCustomerGroup", "createCustomerTag", "createGlobalTaxSettings", "createOneTimeMerchantAppPayment",
+               "createOrderTag", "createPriceList", "createProduct", "createProductAttribute", "createProductBrand", "createProductTag",
+               "createStorefrontJSScript", "createTaxSettings", "deletePriceListList", "downloadOrderInvoice", "removeOrderInvoice", "removeVariantFromProduct",
+               "saveVariantStocks", "saveWebhooks", "updateCampaign", "updateCategory", "updateCustomer", "updateCustomerAndAddressAttributes",
+               "updateCustomerGroup", "updateCustomerTag", "updateGlobalTaxSettings", "updateOrderTag", "updatePriceList", "updateProduct",
+               "updateProductAndVariantAttributes", "updateProductAttribute", "updateProductBrand", "updateProductTag", "updateSalesChannel",
+               "updateStorefrontJSScript", "updateTaxSettings", "updateVariantPrices"}
+api_version = None
+for cand in (".env.example", ".env.sample", ".env.template", ".env.local", ".env"):
+    cp = os.path.join(ROOT, cand)
+    m = re.search(r"api\.myikas\.com/api/(v\d)/admin/graphql", read(cp)) if os.path.exists(cp) else None
+    if m:
+        api_version = (m.group(1), cp, read(cp)[: m.start()].count("\n") + 1)
+        break
+if not api_version:
+    for p, t in files.items():
+        m = re.search(r"api\.myikas\.com/api/(v\d)/admin/graphql", t)
+        if m:
+            api_version = (m.group(1), p, t[: m.start()].count("\n") + 1)
+            break
+if api_version:
+    ver, vp, vl = api_version
+    other = {"v1": V2_ONLY_OPS, "v2": V1_ONLY_OPS}.get(ver, set())
+    add("§5.3", "BILGI", vp, vl, f"Admin API version {ver} (NEXT_PUBLIC_GRAPH_API_URL); operations: {', '.join(sorted(ops)) or 'none'}" + (" — ruleset §11 and schema.py default to v2; run `schema.py --v1` for signatures" if ver == "v1" else ""))
+    for op in sorted(ops & other):
+        op_p = next((q for q, t in files.items() if re.search(r"\.(?:queries|mutations)\." + op + r"\(", t)), None)
+        add("§5.3", "UYARI", op_p, line_of(files[op_p], r"\.(?:queries|mutations)\." + op + r"\(") if op_p else None,
+            f"{op} exists only in the {'v2' if ver == 'v1' else 'v1'} schema but the app targets {ver} — GRAPHQL_VALIDATION_FAILED at runtime (işlevsel; [schema] 2026-09-13, verify with schema.py)")
 IDENTITY_OPS = {"getMerchant", "getAuthorizedApp", "getMerchantLicence", "getMerchantSettings", "getAvailableSubscriptions", "me",
                 "listMerchantAppPayment", "createMerchantAppPayment", "createOneTimeMerchantAppPayment", "getAppDemoDay",
                 "saveWebhooks", "deleteWebhook", "listWebhook", "addCustomTimelineEntry", "getImportJobData", "getImportJobDataList",

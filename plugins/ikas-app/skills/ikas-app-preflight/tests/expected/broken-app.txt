@@ -19,6 +19,7 @@
 §3.3 UYARI src/helpers/token-helpers.ts:120
 §5.1 UYARI src/app/api/ikas/list-products/route.ts:6
 §5.1 UYARI src/lib/with-merchant.ts:1
+§5.3 UYARI src/app/api/ikas/list-products/route.ts:17
 §6.1 UYARI src/app/api/webhooks/ikas/route.ts:1
 §6.1 UYARI src/app/api/webhooks/payment/route.ts:1
 §6.2 UYARI src/app/api/webhooks/ikas/route.ts:9
@@ -32,10 +33,11 @@
 §2.2 BILGI src/app/api/oauth/callback/ikas/route.ts:46
 §3.1 BILGI src/app/callback/page.tsx:1
 §4 BILGI -
+§5.3 BILGI .env.example:3
 §6.1 BILGI src/app/api/webhooks/ikas/route.ts:1
 §6.1 BILGI src/app/api/webhooks/payment/route.ts:1
 §6.2 BILGI -
 §7 BILGI ikas.config.json:1
 §7 BILGI ikas.config.json:1
 §7.1 BILGI src/app/actions/order-list/page.tsx:1
-BLOCKER: 10 UYARI: 20 BILGI: 10
+BLOCKER: 10 UYARI: 21 BILGI: 11

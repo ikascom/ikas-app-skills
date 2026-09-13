@@ -77,7 +77,7 @@ Then the security layer against the inventory: every non-exempt route verifies t
 
 Confirm or re-grade every scanner hit from what you read; when you merge or downgrade hits, say so in one line under Bilgi. Severity comes from app-review.md, and each Blocker states its reason: **güvenlik**, **review**, or **işlevsel**.
 
-For facts you are unsure about (an operation name, an argument type, a webhook scope string) run `python3 ${CLAUDE_SKILL_DIR}/scripts/schema.py <operation|type>` — unauthenticated introspection of the live Admin API, the `[schema]` source. The ikas admin MCP (`.mcp.json` → `https://api.myikas.com/api/v2/admin/mcp`) lists only a curated subset and has mis-rendered argument types (`deleteWebhook` shows `[[String!]]`, live schema says `[String!]!`) — never put an MCP-only signature into a Düzeltme line. Docs URLs are in app-review.md §12. Do not invent scope names.
+For facts you are unsure about (an operation name, an argument type, a webhook scope string) run `python3 ${CLAUDE_SKILL_DIR}/scripts/schema.py <operation|type>` — unauthenticated introspection of the live Admin API, the `[schema]` source. v1 and v2 are different schemas: read the app's `NEXT_PUBLIC_GRAPH_API_URL` first and add `--v1` for a v1 app (§0 `[schema]`, §5.3). The ikas admin MCP (`.mcp.json` → `https://api.myikas.com/api/v2/admin/mcp`) lists only a curated subset and has mis-rendered argument types (`deleteWebhook` shows `[[String!]]`, live schema says `[String!]!`) — never put an MCP-only signature into a Düzeltme line. Docs URLs are in app-review.md §12. Do not invent scope names.
 
 ### Step 4 — Anti-pattern sweep
 

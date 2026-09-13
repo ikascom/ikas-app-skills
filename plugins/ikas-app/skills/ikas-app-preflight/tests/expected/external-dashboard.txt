@@ -20,5 +20,6 @@
 §2.1 BILGI src/globals/config.ts:9
 §3.1 BILGI src/app/callback/page.tsx:1
 §4 BILGI -
+§5.3 BILGI .env.example:3
 §6.2 BILGI -
-BLOCKER: 4 UYARI: 15 BILGI: 4
+BLOCKER: 4 UYARI: 15 BILGI: 5
