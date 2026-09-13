@@ -23,6 +23,7 @@
 §6.1 UYARI src/app/api/webhooks/ikas/route.ts:1
 §6.1 UYARI src/app/api/webhooks/payment/route.ts:1
 §6.2 UYARI src/app/api/webhooks/ikas/route.ts:9
+§6.2 UYARI src/lib/register-webhooks.ts:4
 §7 UYARI ikas.config.json:1
 §7.1 UYARI src/app/actions/order-list/page.tsx:1
 §7.2 UYARI src/app/api/actions/order-detail/route.ts:1
@@ -36,8 +37,7 @@
 §5.3 BILGI .env.example:3
 §6.1 BILGI src/app/api/webhooks/ikas/route.ts:1
 §6.1 BILGI src/app/api/webhooks/payment/route.ts:1
-§6.2 BILGI -
 §7 BILGI ikas.config.json:1
 §7 BILGI ikas.config.json:1
 §7.1 BILGI src/app/actions/order-list/page.tsx:1
-BLOCKER: 10 UYARI: 21 BILGI: 11
+BLOCKER: 10 UYARI: 22 BILGI: 10

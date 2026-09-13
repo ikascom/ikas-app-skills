@@ -765,6 +765,13 @@ if scope_decl:
         if fam not in requested_families:
             need = "write_storefronts" if fam == "storefronts" else f"read_{fam}/write_{fam}"
             add("§2.1", "UYARI", p, line_of(files[p], r"REQUIRED_SCOPES|scope"), f"{', '.join(sorted(fam_ops))} called but no {fam} scope ({need}) is requested — the call fails with a permission error at runtime (işlevsel; verify against the Partner-panel scope list)")
+# [observed] E5: saveWebhooks rejects these scopes with INVALID_SCOPE (lifecycle scopes come only via the Partner-panel Bildirim Adresi)
+REJECTED_SAVE_SCOPES = r"store/(product/deleted|app/deleted|app/payment)"
+for p, t in files.items():
+    if re.search(r"mutations\.saveWebhooks?\(", t):
+        m = re.search(REJECTED_SAVE_SCOPES, t)
+        if m:
+            add("§6.2", "UYARI", p, line_of(t, REJECTED_SAVE_SCOPES), f"saveWebhooks is called in a file that lists scope `{m.group(0)}` — the API rejects it with INVALID_SCOPE ([observed] E5); store/app/* arrive only via the Partner-panel Bildirim Adresi, store/product/deleted is not deliverable — işlevsel")
 if has_webhook_route and not any(re.search(r"mutations\.saveWebhooks?\(", t) for t in files.values()):
     DATA_SCOPES = r"store/(order|product|customer|customerFavoriteProducts|stock)/"
     data_routes = [rel_route(p) for p in signed_inputs if route_group(p) == "webhook" and re.search(DATA_SCOPES, expanded(p))]

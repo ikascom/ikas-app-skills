@@ -128,5 +128,6 @@ Write the report in Turkish following `references/report-template.md` exactly: K
 - Trusting scanner silence for routes. The inventory from Step 2 is the truth.
 - Applying fixes before the user answered, or applying non-catalogue fixes.
 - Saying "review'dan geçer".
+- Treating a failing callback as "the merchant will just retry". `[observed]` E3: ikas creates the authorization at the grant step; a callback that 500s still leaves the app listed as installed in Admin and Partner, and the iframe then opens with a bridge token the backend has never seen. Grade the callback's failure paths (§2.2, §10 #8, #23) as what the reviewer will actually see.
 - Reporting `saveWebhooks`-without-`deleteWebhook` at all: ikas removes the registrations on uninstall (§6.2 `[observed]` E1). The opposite mistake: assuming ikas revokes the access token on uninstall — it does not (E1); the app's own `deleted` flag is what stops post-removal reads.
 - Copying a signature from MCP `introspect` into a Düzeltme without checking `schema.py`.
