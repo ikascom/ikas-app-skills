@@ -81,7 +81,7 @@ For facts you are unsure about (an operation name, an argument type, a webhook s
 
 ### Step 4 — Anti-pattern sweep
 
-Read app-review.md §10 and check items #1–#19 explicitly. Cite as `§10 #n`; when an item is also a §2–§9 rule, cite both.
+Read app-review.md §10 and check items #1–#22 explicitly (#7 is retired). Cite as `§10 #n`; when an item is also a §2–§9 rule, cite both.
 
 ### Step 5 — Report
 
