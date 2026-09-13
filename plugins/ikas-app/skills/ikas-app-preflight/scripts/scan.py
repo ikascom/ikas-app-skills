@@ -306,6 +306,8 @@ for p in callback_files:
         add("§2.3", "UYARI", p, line_of(t, r"session\.(accessToken|refreshToken|access_token|refresh_token)\s*="), "ikas token written to the browser session cookie instead of a server-side row keyed by authorizedAppId — sealed cookie, so not a leak, but nothing server-side knows the merchant (R3 pattern)")
     if not re.search(r"getMerchant|getAuthorizedApp", t):
         add("§2.2", "UYARI", p, 1, "Callback does not resolve merchant/authorizedApp identity server-side after the exchange (getMerchant + getAuthorizedApp) [docs:callback-api]")
+    elif re.search(r"getAuthorizedApp", tx) and not re.search(r"isSuccess|\.errors\b", tx):
+        add("§2.3", "UYARI", p, line_of(t, r"getAuthorizedApp") or 1, "getAuthorizedApp result used without an isSuccess/errors check — the SDK never throws, an errored result has no `deleted`/`storeAppId`, so the guard passes on failure [sdk] (fail-open)")
     if re.search(r"(NextResponse\.json|res\.json|cookies\(\)\.set|searchParams\.set)\([^)]*(access_token|refresh_token|accessToken|refreshToken)", t):
         add("§2.3", "BLOCKER", p, line_of(t, r"(access_token|refresh_token|accessToken|refreshToken)"), "ikas access/refresh token appears in a response, cookie or redirect query — güvenlik")
 
