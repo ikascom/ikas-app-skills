@@ -2,7 +2,7 @@
 name: ikas-app-preflight
 description: Pre-review audit for ikas Admin Apps (Next.js apps installed into the ikas panel via OAuth, using @ikas/admin-api-client / @ikas/app-helpers). Checks the five App Store publishing prerequisites, the OAuth / App Bridge / iframe contract, webhook and app-action signature verification, secret hygiene and public-endpoint safety against a sourced ruleset, writes the report in Turkish, then asks before applying catalogued fixes. Use whenever the user asks if an ikas app is ready for review or the App Store, wants the install / uninstall / OAuth / webhook / action flow checked, or says "review'a hazır mı", "app store'a göndermeden önce kontrol et", "ikas app denetle", "publish checklist", "pre-review" — even if they only name one area (e.g. "webhook imzası doğru mu").
 argument-hint: "[quick | section <oauth|iframe|webhooks|actions|secrets|public>] [project-path]"
-allowed-tools: Read, Grep, Glob, Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/scan.py *), Bash(git status *), Bash(git log *), Bash(git rev-parse *), Bash(git check-ignore *), Bash(git diff *)
+allowed-tools: Read, Grep, Glob, Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/scan.py *), Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/schema.py *), Bash(git status *), Bash(git log *), Bash(git rev-parse *), Bash(git check-ignore *), Bash(git diff *)
 effort: high
 ---
 
@@ -71,13 +71,13 @@ Open `references/app-review.md` with Read and grade section by section; do not g
 | ikas arayüzü | the §4 row for the shape holds | §4 |
 | Aksiyon | iframe: params, loader, result, `closeApp`; API: HMAC first | §7 |
 | Plan (paid) | `PAID` only, key mapping, `getMerchantLicence` gating | §6.4 |
-| Kaldırma | signature → secret guard → statuses → token invalidated → footprint removed → routes refuse the dead token. No webhook route at all → one §6.2 Uyarı (priority 1 if the app injects scripts/campaigns) plus the Partner-panel Beyan row; do not repeat it per route | §6.1, §6.2, §5.1 |
+| Kaldırma | signature → secret guard → statuses → Admin API cleanup (`deleteStorefrontJSScript`, campaigns, best-effort `deleteWebhook`) → token invalidated → routes refuse the dead token. No webhook route at all → one §6.2 Uyarı (priority 1 if the app injects scripts/campaigns) plus the Partner-panel Beyan row; do not repeat it per route. `saveWebhooks` without `deleteWebhook` is **Bilgi** (§6.2) unless the data route skips the installation-status check | §6.1, §6.2, §5.1 |
 
 Then the security layer against the inventory: every non-exempt route verifies the JWT before work and takes identity from `aud`/`sub` (§5.1); no client → Admin API (§5.2); webhooks and API actions verify before acting, fail closed, honest statuses (§6.1, §7.2); nothing secret under `NEXT_PUBLIC_`, env files ignored, no token logging, `oauthRedirectPath` matches a route (§8); public endpoints scope by merchant, take no money from the client, rate-limit writes (§9).
 
 Confirm or re-grade every scanner hit from what you read; when you merge or downgrade hits, say so in one line under Bilgi. Severity comes from app-review.md, and each Blocker states its reason: **güvenlik**, **review**, or **işlevsel**.
 
-For facts you are unsure about (an operation name, a webhook scope string), use the ikas admin MCP if the session has one (`.mcp.json` → `https://api.myikas.com/api/v2/admin/mcp`), otherwise cite the docs URL from app-review.md §12. Do not invent scope names.
+For facts you are unsure about (an operation name, an argument type, a webhook scope string) run `python3 ${CLAUDE_SKILL_DIR}/scripts/schema.py <operation|type>` — unauthenticated introspection of the live Admin API, the `[schema]` source. The ikas admin MCP (`.mcp.json` → `https://api.myikas.com/api/v2/admin/mcp`) lists only a curated subset and has mis-rendered argument types (`deleteWebhook` shows `[[String!]]`, live schema says `[String!]!`) — never put an MCP-only signature into a Düzeltme line. Docs URLs are in app-review.md §12. Do not invent scope names.
 
 ### Step 4 — Anti-pattern sweep
 
@@ -85,7 +85,7 @@ Read app-review.md §10 and check items #1–#19 explicitly. Cite as `§10 #n`; 
 
 ### Step 5 — Report
 
-Write the report in Turkish following `references/report-template.md` exactly: Karar → Bir bakışta → **Yapılacaklar** (the action list, first) → Blocker'lar → Uyarılar → Kod dışında doğrulanacaklar → Temiz alanlar ve notlar → İsteğe bağlı öneriler (max 5). Every finding header names the area in Turkish before the § (`OAuth callback (§2.2)`); every finding has a one-line `Düzeltme:`. Findings are **blocks, not wide tables** (the terminal re-flows tables into unreadable key/value walls); Bilgi bullets are one line each. Evidence = `path:line` + what you saw. Grade SHOULD rules by the severity the ruleset names (most are Bilgi, not kontrat dışı — kontrat dışı is only for advice no § covers). End with one line: the report can be saved as `PREFLIGHT-REPORT.md` in the project root on request (do not write it unasked — Steps 1–5 change nothing). Build the Beyan table from §1 and the app shape:
+Write the report in Turkish following `references/report-template.md` exactly: Karar → Bir bakışta → **Yapılacaklar** (the action list, first) → Bulgu özeti (4-column index) → Blocker'lar → Uyarılar → Kod dışında doğrulanacaklar → Temiz alanlar ve notlar → İsteğe bağlı öneriler (max 5). Every finding header names the area in Turkish before the § (`OAuth callback (§2.2)`); every finding has a one-line `Düzeltme:`. Findings are **blocks**; tables only where every cell is short (Bulgu özeti, Beyan, the one-line §10 sweep) — wide tables re-flow into unreadable key/value walls in the terminal; Bilgi bullets are one line each. Evidence = `path:line` + what you saw. Grade SHOULD rules by the severity the ruleset names (most are Bilgi, not kontrat dışı — kontrat dışı is only for advice no § covers). End with one line: the report can be saved as `PREFLIGHT-REPORT.md` in the project root on request (do not write it unasked — Steps 1–5 change nothing). Build the Beyan table from §1 and the app shape:
 
 | Soru | Neden |
 |---|---|
@@ -128,3 +128,5 @@ Write the report in Turkish following `references/report-template.md` exactly: K
 - Trusting scanner silence for routes. The inventory from Step 2 is the truth.
 - Applying fixes before the user answered, or applying non-catalogue fixes.
 - Saying "review'dan geçer".
+- Grading `saveWebhooks`-without-`deleteWebhook` as Uyarı, or claiming ikas keeps delivering after uninstall. Unverified; delivery stops after 3 failed retries; §6.2 says Bilgi + best-effort cleanup + a `listWebhook` DECLARE row.
+- Copying a signature from MCP `introspect` into a Düzeltme without checking `schema.py`.

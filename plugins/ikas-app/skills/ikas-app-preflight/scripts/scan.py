@@ -543,6 +543,8 @@ for p in signed_inputs:
                 add("§6.2", "BILGI", p, 1, "Webhook route does not match the uninstall scope (store/app/deleted) — is uninstall handled elsewhere?")
         elif not re.search(r"store/app/deleted|WebhookScope\.APP_DELETED", tx):
             add("§6.2", "UYARI", p, line_of(t, r"uninstall|authorizedApp/deleted") or 1, "Official uninstall scope 'store/app/deleted' [sdk: WebhookScope] is not in the matched list")
+        elif re.search(r"store/app/uninstalled|store/authorizedApp/deleted", t):
+            add("§6.2", "BILGI", p, line_of(t, r"store/app/uninstalled|store/authorizedApp/deleted") or 1, "Matches 'store/app/uninstalled' / 'store/authorizedApp/deleted' too — not in the SDK enum, dead branches; only store/app/deleted is delivered")
         if re.search(r"store/app/deleted|uninstall", tx, re.I) and re.search(r"if\s*\(\s*!\s*authToken\s*\)", tx) and not re.search(r"authToken\??\.deleted", tx):
             add("§6.2", "UYARI", p, line_of(t, r"if\s*\(\s*!\s*authToken\s*\)") or 1, "Uninstall handler short-circuits on missing token but not on an already-deleted one — second delivery re-runs cleanup with a dead token (F11)")
         if not re.search(r"markProcessed|dedupe|duplicate|processedAt|webhookEvent|idempot", tx, re.I):
@@ -570,6 +572,9 @@ if script_files:
         add("§6.2", "BLOCKER", script_files[0], line_of(files[script_files[0]], r"createStorefrontJSScript|saveStorefrontJSScript"), "Storefront script is not created in the OAuth callback; callers: " + (", ".join(callers[:4]) or "none found") + " — if the dashboard installs it automatically on first load, downgrade to Bilgi; if a merchant must click, the reviewer installs, opens the storefront and sees nothing [observed] R5 (§10 #17) — review")
     if not any(re.search(r"deleteStorefrontJSScript", expanded(p)) for p in app_files if is_route(p) and route_group(p) == "webhook"):
         add("§6.2", "BLOCKER", script_files[0], 1, "App injects a storefront script but no webhook route calls deleteStorefrontJSScript on store/app/deleted [observed] R5 (§10 #17) — review")
+if any(re.search(r"mutations\.saveWebhooks?\(", t) for t in files.values()) and not any(re.search(r"mutations\.deleteWebhook\(", t) for t in files.values()):
+    wh = next(p for p, t in files.items() if re.search(r"mutations\.saveWebhooks?\(", t))
+    add("§6.2", "BILGI", wh, line_of(files[wh], r"mutations\.saveWebhooks?\("), "saveWebhooks at install, no deleteWebhook(scopes: [String!]!) on uninstall — whether ikas drops the registration itself is unverified; delivery stops after 3 failed retries and a status-checked data route ignores it anyway. Suggest a best-effort deleteWebhook before token invalidation; Uyarı only if the data route does not check installation status")
 if not has_webhook_route:
     if injects:
         add("§6.2", "UYARI", None, None, "No webhook route, but the app creates storefront scripts/campaigns/webhooks — nothing removes them on uninstall and the token stays usable (§10 #17; not a documented prerequisite, starter has none)")
@@ -680,17 +685,21 @@ for p, t in files.items():
 ops = set()
 for t in files.values():
     ops.update(re.findall(r"\.(?:queries|mutations)\.(\w+)\(", t))
-IDENTITY_OPS = {"getMerchant", "getAuthorizedApp", "getMerchantLicence", "me",
-                "listMerchantAppPayment", "createMerchantAppPayment", "saveWebhooks", "deleteWebhook", "getAppDemoDay", "addCustomTimelineEntry",
-                "getSalesChannel", "updateSalesChannel", "getGlobalTaxSettings", "listShippingSettings", "listTaxSettings",
-                "listCountry", "listState", "listCity", "listDistrict", "listTown"}  # [mcp] no scope family
+IDENTITY_OPS = {"getMerchant", "getAuthorizedApp", "getMerchantLicence", "getMerchantSettings", "getAvailableSubscriptions", "me",
+                "listMerchantAppPayment", "createMerchantAppPayment", "createOneTimeMerchantAppPayment", "getAppDemoDay",
+                "saveWebhooks", "deleteWebhook", "listWebhook", "addCustomTimelineEntry", "getImportJobData", "getImportJobDataList",
+                "getSalesChannel", "listSalesChannel", "updateSalesChannel",
+                "listPriceList", "createPriceList", "updatePriceList", "deletePriceListList", "listCurrency", "listPaymentGateway", "listCargoCompany",
+                "getGlobalTaxSettings", "listGlobalTaxSettings", "createGlobalTaxSettings", "updateGlobalTaxSettings", "deleteGlobalTaxSettingsList",
+                "listShippingSettings", "listTaxSettings", "createTaxSettings", "updateTaxSettings", "deleteTaxSettingsList",
+                "listCountry", "listState", "listCity", "listDistrict", "listTown"}  # [schema] no scope family (§11)
 # §11 — operation-name keyword → scope family (heuristic; only zero-operation families are flagged)
 FAMILY = {
-    "order": "orders", "package": "orders", "fulfil": "orders", "shipment": "orders",
+    "order": "orders", "package": "orders", "fulfil": "orders", "shipment": "orders", "branch": "orders", "terminal": "orders",
     "product": "products", "variant": "products", "category": "products", "brand": "products", "vendor": "products", "tag": "products", "attribute": "products",
     "customer": "customers", "address": "customers",
     "campaign": "campaigns", "coupon": "campaigns", "discount": "campaigns", "promotion": "campaigns",
-    "stock": "inventories", "inventor": "inventories", "variantstock": "inventories",
+    "stock": "inventories", "inventor": "inventories", "variantstock": "inventories", "stocklocation": "inventories",
     "abandonedcheckout": "orders", "fulfil": "orders", "transaction": "orders", "invoice": "orders",
     "storefront": "storefronts", "script": "storefronts", "theme": "storefronts",
 }

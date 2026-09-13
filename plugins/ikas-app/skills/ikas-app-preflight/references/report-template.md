@@ -20,7 +20,7 @@ The report is written **in Turkish** regardless of the language of SKILL.md, unl
    | §9 | Storefront uçları |
    | §10 #n | Bilinen hata kalıbı #n |
 
-3. **Blocks, not wide tables** (the terminal re-flows tables into key/value walls). Only the two-column "kod dışında" table stays a table. Bilgi and öneri bullets are one line each, path first.
+3. **Narrow tables for indexes, blocks for detail.** A table is fine when every cell is short (≤ 40 chars, ≤ 4 columns): the *Bulgu özeti* index, the "kod dışında" table, the §10 sweep. Findings themselves are blocks (Bulgu / Kanıt / Düzeltme) — a table cell cannot hold a `path:line` plus what was seen without the terminal re-flowing it into a key/value wall. Bilgi and öneri bullets are one line each, path first.
 
 ## Contents
 
@@ -46,6 +46,13 @@ The report is written **in Turkish** regardless of the language of SKILL.md, unl
 3. **Partner paneli** — … → kod dışında
 <Blocker'lar önce, sonra Uyarılar, sonra kod dışı işler. Her madde: nerede, ne değişecek, hangi bulguya bağlı, katalogda hazır tarif var mı.>
 
+## Bulgu özeti
+| # | Şiddet | Alan | Dosya |
+|---|---|---|---|
+| B1 | güvenlik | Webhook imzası | `api/webhooks/capture/route.ts` |
+| U1 | uyarı | OAuth callback | `lib/signatures.ts:11` |
+<Bir satır = bir bulgu; sıra Yapılacaklar ile aynı. Dosya `src/` öneki olmadan, tek satır. Bulgu yoksa bölümü atla.>
+
 ## 1. Blocker'lar
 **B1 · güvenlik · Webhook imzası (§6.1, §10 #2) `[security]`**
 Bulgu: <tek cümle, ne yanlış>
@@ -69,6 +76,7 @@ Düzeltme: …
 
 ## 4. Temiz alanlar ve notlar
 - `dosya:satır` — tek satır, tek gerçek (temiz alan kanıtı; birleştirilen/düşürülen scanner hit'i ve gerekçesi)
+- §10 taraması: ✓ 1, 2, 3, 4, 6, 10, 11 · n/a 5, 9, 12 · bulgu 8→U2, 15→U3, 17→U5   ← tek satır, üç grup; "#1 ✓ #2 ✓ …" dizisi yazma
 
 ## 5. İsteğe bağlı öneriler (kural gerektirmiyor, en fazla 5)
 - …
@@ -84,12 +92,13 @@ Uygulanmayanlar: F4 — ön koşul sağlanmadı (config zaten normalize ediyor)
 
 ## Column rules
 
-- **Header line** — `**B1 · <neden> · <Alan adı> (<§>) <kaynak etiketi>**` for Blockers, `**U1 · <Alan adı> (<§>) <kaynak etiketi>**` for Uyarılar; area names from the table above. Neden is exactly one of `güvenlik`, `review`, `işlevsel` (app-review.md §0). Source tags: `[docs:…]`, `[sdk]`, `[partner-panel]`, `[mcp]`, `[security]`, `[observed] R<n>` (cite the rejection number). A finding with no § is **kontrat dışı** and goes to section 5.
+- **Header line** — `**B1 · <neden> · <Alan adı> (<§>) <kaynak etiketi>**` for Blockers, `**U1 · <Alan adı> (<§>) <kaynak etiketi>**` for Uyarılar; area names from the table above. Neden is exactly one of `güvenlik`, `review`, `işlevsel` (app-review.md §0). Source tags: `[docs:…]`, `[sdk]`, `[schema]`, `[mcp]`, `[partner-panel]`, `[security]`, `[observed] R<n>` (cite the rejection number). A finding with no § is **kontrat dışı** and goes to section 5.
 - **Bulgu** — one sentence, what is wrong, no "should consider".
 - **Kanıt** — `path:line` plus what you saw there, enough to verify without re-auditing. Quote the scanner line when it *is* the evidence. Mark files that are `untracked` or `gitignored` (`git status --porcelain --ignored`) — they are still in the working tree and will ship if deployed from it.
 - **Düzeltme** — one sentence, imperative, concrete ("`state` karşılaştırmasını `state && session.state` koşuluna al"). Same text feeds the Yapılacaklar list.
 - **Length** — Bulgu ≤ 1 line, Kanıt ≤ 2 lines, Düzeltme ≤ 1 line, every note bullet ≤ 1 line. Long reasoning goes nowhere; the evidence column is what the developer opens.
 - **Bir bakışta** — plain Turkish for the developer's manager or the reviewer contact; no §, no file paths, no severity jargon. It summarises, never adds a finding that is not in sections 1–3.
+- **Bulgu özeti** — one row per finding, same order as Yapılacaklar, four short cells; it is the index a reader scans before opening a block. Never put Bulgu/Kanıt text in it.
 - **Karar** — honest. "Şu iki düzeltmeyle gönderilebilir" is fine when the Blockers are each a small, obvious change. With no Blocker: "Bu kural setine göre Blocker kalmadı; en yüksek öncelikli uyarı: …" (name one). Never say "review'dan geçer".
 - Sort: Blockers — güvenlik first, then review, then işlevsel. Uyarılar — by §.
 - Do not list Uyarı-level items in the Blocker table to make the report look thorough; do not hide a Blocker in Bilgi to make it look clean.
@@ -115,6 +124,14 @@ Uygulanmayanlar: F4 — ön koşul sağlanmadı (config zaten normalize ediyor)
 3. **`src/app/api/ikas/get-merchant/route.ts`** — `withMerchant` ile sar → U2 · katalogda F10 var
 4. **`src/globals/config.ts`** — kullanılmayan 4 scope'u çıkar, Partner panelini eşle → U1 · elle (re-authorize gerektirir)
 5. **Partner paneli** — Bildirim Adresi'ni `<deployUrl>/api/webhooks/ikas` yap; 2 dev mağazayı İzin Verilen Mağazalar'a ekle → kod dışında
+
+## Bulgu özeti
+| # | Şiddet | Alan | Dosya |
+|---|---|---|---|
+| B1 | güvenlik | Webhook imzası | `api/webhooks/capture/route.ts` |
+| B2 | review | Kaldırma / storefront script | `lib/storefront-script.ts:68` |
+| U1 | uyarı | OAuth başlatma | `globals/config.ts:2` |
+| U2 | uyarı | Backend API | `api/ikas/get-merchant/route.ts:18` |
 
 ## 1. Blocker'lar
 **B1 · güvenlik · Webhook imzası (§6.1, §10 #2, #19) `[security]`**

@@ -30,7 +30,7 @@ Güncelleme: `/plugin marketplace update ikas-app-skills`
 Bir ikas Admin App'in **App Store review'ı öncesi ön kontrolü.** Ölçüt, skill ile gelen
 `references/app-review.md` kural seti. Her kural kaynağını taşır — `[docs:…]` (builders.ikas.com
 sayfası), `[sdk]` (`@ikas/admin-api-client`, `@ikas/app-helpers`), `[starter]` (resmi
-`ikascom/ikas-app-examples` davranışı), `[partner-panel]` (Partner panel ekranları), `[mcp]` (canlı Admin API şeması), `[security]`,
+`ikascom/ikas-app-examples` davranışı), `[partner-panel]` (Partner panel ekranları), `[schema]` (canlı Admin API şeması, `scripts/schema.py`), `[mcp]` (ikas MCP; 124 operasyonun 59'u, imza render hatası olabilir), `[security]`,
 `[observed]` (gerçek review ret mesajları, §12 R1–R7) — ve her bulgu ya ihlal
 ettiği bölümü zikreder (§2.2, §6.1, §10 #4…) ya da "kontrat dışı" etiketlenir.
 
@@ -97,6 +97,7 @@ skills/ikas-app-preflight/
 ├── references/report-template.md   # Türkçe rapor şablonu + örnek
 ├── references/fix-catalogue.md     # onay sonrası uygulanabilir tarifler F1–F14
 ├── scripts/scan.py                 # kanıt tarayıcısı (--json, --section; import'ları takip eder; App + Pages Router)
+├── scripts/schema.py               # canlı Admin API şeması: `schema.py deleteWebhook` (token gerekmez; `[schema]` kaynağı)
 ├── scripts/calibrate.sh            # resmi örneklerde sıfır Blocker kapısı
 └── tests/                          # fixture'lar + snapshot testi (tests/run.sh)
 ```
