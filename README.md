@@ -1,9 +1,8 @@
 # ikas-app-skills
 
-ikas Admin App (Next.js ile geliştirilip OAuth ile mağaza paneline kurulan uygulama)
-projeleri için Claude Code skill kütüphanesi. Skill'ler tek bir plugin (`ikas-app`) altında
-toplanır ve Claude Code plugin marketplace'i ile dağıtılır. Tema (Code Components) skill'leri
-için kardeş repo: `ikascom/ikas-cc-skills`.
+ikas app projeleri için Claude Code skill kütüphanesi. Skill'ler tek bir plugin (`ikas-app`) altında  
+toplanır ve Claude Code plugin marketplace'i ile dağıtılır. Tema (Code Components) skill'leri  
+için diğer repoya göz atın: `ikascom/ikas-cc-skills`.
 
 ## Kurulum
 
