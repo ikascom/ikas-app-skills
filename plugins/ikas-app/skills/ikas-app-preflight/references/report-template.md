@@ -20,7 +20,7 @@ The report is written **in Turkish** regardless of the language of SKILL.md, unl
    | §9 | Storefront uçları |
    | §10 #n | Bilinen hata kalıbı #n |
 
-3. **Narrow tables for indexes, blocks for detail.** A table is fine when every cell is short (≤ 40 chars, ≤ 4 columns): the *Bulgu özeti* index, the "kod dışında" table, the §10 sweep. Findings themselves are blocks (Bulgu / Kanıt / Düzeltme) — a table cell cannot hold a `path:line` plus what was seen without the terminal re-flowing it into a key/value wall. Bilgi and öneri bullets are one line each, path first.
+3. **Code-block index, blocks for detail, one markdown table.** The terminal renders markdown tables with box-drawing and caps column widths, so even a 4-column table truncates file paths (`lib/signat…`). The *Bulgu özeti* index is therefore a **fenced ```text block** with hand-aligned columns — monospace, never re-flowed. The only markdown table is "Kod dışında doğrulanacaklar" (long questions wrap acceptably there). Findings are blocks (Bulgu / Kanıt / Düzeltme); Bilgi and öneri bullets are one line each, path first; the §10 sweep is one line.
 
 ## Contents
 
@@ -47,11 +47,12 @@ The report is written **in Turkish** regardless of the language of SKILL.md, unl
 <Blocker'lar önce, sonra Uyarılar, sonra kod dışı işler. Her madde: nerede, ne değişecek, hangi bulguya bağlı, katalogda hazır tarif var mı.>
 
 ## Bulgu özeti
-| # | Şiddet | Alan | Dosya |
-|---|---|---|---|
-| B1 | güvenlik | Webhook imzası | `api/webhooks/capture/route.ts` |
-| U1 | uyarı | OAuth callback | `lib/signatures.ts:11` |
-<Bir satır = bir bulgu; sıra Yapılacaklar ile aynı. Dosya `src/` öneki olmadan, tek satır. Bulgu yoksa bölümü atla.>
+```text
+#   Şiddet    Alan                 Dosya
+B1  güvenlik  Webhook imzası       api/webhooks/capture/route.ts
+U1  uyarı     OAuth callback       lib/signatures.ts:11
+```
+<Fenced ```text block, boşlukla hizalı 4 sütun; bir satır = bir bulgu; sıra Yapılacaklar ile aynı; dosya `src/` öneki olmadan. Bulgu yoksa bölümü atla.>
 
 ## 1. Blocker'lar
 **B1 · güvenlik · Webhook imzası (§6.1, §10 #2) `[security]`**
@@ -98,7 +99,7 @@ Uygulanmayanlar: F4 — ön koşul sağlanmadı (config zaten normalize ediyor)
 - **Düzeltme** — one sentence, imperative, concrete ("`state` karşılaştırmasını `state && session.state` koşuluna al"). Same text feeds the Yapılacaklar list.
 - **Length** — Bulgu ≤ 1 line, Kanıt ≤ 2 lines, Düzeltme ≤ 1 line, every note bullet ≤ 1 line. Long reasoning goes nowhere; the evidence column is what the developer opens.
 - **Bir bakışta** — plain Turkish for the developer's manager or the reviewer contact; no §, no file paths, no severity jargon. It summarises, never adds a finding that is not in sections 1–3.
-- **Bulgu özeti** — one row per finding, same order as Yapılacaklar, four short cells; it is the index a reader scans before opening a block. Never put Bulgu/Kanıt text in it.
+- **Bulgu özeti** — a fenced ```text block (never a markdown table), one row per finding, same order as Yapılacaklar, four space-aligned columns; it is the index a reader scans before opening a block. Never put Bulgu/Kanıt text in it.
 - **Karar** — honest. "Şu iki düzeltmeyle gönderilebilir" is fine when the Blockers are each a small, obvious change. With no Blocker: "Bu kural setine göre Blocker kalmadı; en yüksek öncelikli uyarı: …" (name one). Never say "review'dan geçer".
 - Sort: Blockers — güvenlik first, then review, then işlevsel. Uyarılar — by §.
 - Do not list Uyarı-level items in the Blocker table to make the report look thorough; do not hide a Blocker in Bilgi to make it look clean.
@@ -126,12 +127,13 @@ Uygulanmayanlar: F4 — ön koşul sağlanmadı (config zaten normalize ediyor)
 5. **Partner paneli** — Bildirim Adresi'ni `<deployUrl>/api/webhooks/ikas` yap; 2 dev mağazayı İzin Verilen Mağazalar'a ekle → kod dışında
 
 ## Bulgu özeti
-| # | Şiddet | Alan | Dosya |
-|---|---|---|---|
-| B1 | güvenlik | Webhook imzası | `api/webhooks/capture/route.ts` |
-| B2 | review | Kaldırma / storefront script | `lib/storefront-script.ts:68` |
-| U1 | uyarı | OAuth başlatma | `globals/config.ts:2` |
-| U2 | uyarı | Backend API | `api/ikas/get-merchant/route.ts:18` |
+```text
+#   Şiddet    Alan                           Dosya
+B1  güvenlik  Webhook imzası                 api/webhooks/capture/route.ts
+B2  review    Kaldırma / storefront script   lib/storefront-script.ts:68
+U1  uyarı     OAuth başlatma                 globals/config.ts:2
+U2  uyarı     Backend API                    api/ikas/get-merchant/route.ts:18
+```
 
 ## 1. Blocker'lar
 **B1 · güvenlik · Webhook imzası (§6.1, §10 #2, #19) `[security]`**
