@@ -1,6 +1,6 @@
 ---
 name: ikas-app-preflight
-description: Pre-review audit for ikas Admin Apps (Next.js apps installed into the ikas panel via OAuth, using @ikas/admin-api-client / @ikas/app-helpers). Checks the five App Store publishing prerequisites, the OAuth / App Bridge / iframe contract, webhook and app-action signature verification, secret hygiene and public-endpoint safety against a sourced ruleset, writes the report in Turkish, then asks before applying catalogued fixes. Use whenever the user asks if an ikas app is ready for review or the App Store, wants the install / uninstall / OAuth / webhook / action flow checked, or says "review'a hazır mı", "app store'a göndermeden önce kontrol et", "ikas app denetle", "publish checklist", "pre-review" — even if they only name one area (e.g. "webhook imzası doğru mu").
+description: Pre-review audit for ikas Admin Apps (Next.js apps installed into the ikas panel via OAuth, using @ikas/admin-api-client / @ikas/app-helpers). Checks the five App Store publishing prerequisites, the OAuth / App Bridge / iframe contract, webhook and app-action signature verification, secret hygiene and public-endpoint safety against a sourced ruleset, writes the report in Turkish, then asks before applying catalogued fixes. Use whenever the user asks if an ikas app is ready for review or the App Store, wants the install / uninstall / OAuth / webhook / action flow checked, or says "review'a hazır mı", "app store'a göndermeden önce kontrol et", "ikas app denetle", "publish checklist", "pre-review", or pastes an ikas review rejection message ("uygulamamız reddedildi", "şu red mesajını aldık") — even if they only name one area (e.g. "webhook imzası doğru mu").
 argument-hint: "[quick | section <oauth|iframe|webhooks|actions|secrets|public>] [project-path]"
 allowed-tools: Read, Grep, Glob, Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/scan.py *), Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/schema.py *), Bash(git status *), Bash(git log *), Bash(git rev-parse *), Bash(git check-ignore *), Bash(git diff *)
 effort: high
@@ -25,6 +25,8 @@ Predict what the ikas reviewer and the merchant will experience, and find the se
 | `section <area>` | Step 1 with `--section <area>` (scanner prints only the matching §) + the matching § in Steps 2–3: `oauth` = §2; `iframe` = §3 + §4; `webhooks` = §6; `actions` = §7; `secrets` = §8 + §5.1/§5.3; `public` = §9 + §5.2. §10 is always in scope |
 
 The project root is the last argument if it is a path, otherwise the current working directory. Steps 1–5 change nothing: no edits, no `git` writes. Step 6 edits only after the user says yes.
+
+**Previous rejection message.** If the user pastes an ikas review/rejection message (or one is in the repo), treat every sentence of it as an input: each maps to a Blocker/Uyarı, a Beyan row, or — if nothing in the code matches — an AskUserQuestion. The Yapılacaklar list starts with these, tagged `[önceki red]`. `[observed]` R8: an app was rejected twice because the resubmission fixed only the test-account line and skipped the "sürekli yükleniyor" note in the same message.
 
 ## Procedure
 
@@ -55,7 +57,7 @@ Also run `git status --porcelain --ignored` in the project root. Untracked and i
 Read `ikas.config.json`, `package.json`, `.env.example`, the `src/app` (or `app`) route tree, and the first component the panel renders (`/` and where it redirects). Produce:
 
 - **Routes by kind:** OAuth authorize/callback; admin API (JWT); webhooks; iframe action pages and API action routes; public/storefront endpoints; iframe pages; operational (health, metrics). The route tree, not the scanner, is the source of truth — open every `api/` route the scanner did not classify by name and decide from the body (an HMAC over `{signature, data}` is a webhook or API action whatever the path is called). If a route's caller still cannot be told from the code (no JWT, no signature, no key, no obvious cron/operator gate), **ask** with AskUserQuestion — "Bu route'u kim çağırıyor?" with options panel (JWT) / ikas webhook or action / storefront (anonymous) / operator or cron — and grade it under the matching §. Never guess a route into §5.1 silence.
-- **App shape** per app-review.md §4 — exactly one of (a) in-panel dashboard, (b) external dashboard, (c) action-only, (d) headless. It decides which §4 row and which DECLARE rows apply.
+- **App shape** per app-review.md §4 — exactly one of (a) in-panel dashboard, (b) external dashboard, (c) action-only, (d) headless. It decides which §4 row and which DECLARE rows apply. For (b) also list the **re-entry branches** of the root (tenant registered / signup incomplete / missing) — the reviewer opens the app on a store where it is already installed, so §4's re-entry table is audited, not just the install path.
 - **Paid or free** — `store/app/payment`, `getMerchantLicence`, plan keys.
 - **Requested scopes vs operations** — collect `ikas.queries.X` / `ikas.mutations.X`, map with §11.
 
@@ -93,6 +95,8 @@ Write the report in Turkish following `references/report-template.md` exactly: K
 | Partner hesabı doğrulandı mı? | §1 #2 |
 | Uygulama en az 2 geliştirme mağazasında kurulu ve test edilebilir mi? Partner panel › İzin Verilen Mağazalar'da "Kullanımda" görünen mağaza adları? | §1 #5 `[partner-panel]` |
 | (Shape b) Reviewer için harici panelde çalışan bir test hesabı dev@ikas.com'a gönderilecek mi? Review bunsuz ilerlemiyor | §4 (b) `[observed]` R1 |
+| (Shape b) Kayıtlı bir kullanıcı ve formu yarım bırakmış bir kullanıcı ikas panelinden uygulamayı tekrar açtığında bilgi alanı + link görüyor mu (spinner değil)? Dev mağazalarda denendi mi? | §4 (b) `[observed]` R8 |
+| (Shape b) Dev mağazalarda login/kayıt adımını atlayan seed veya allow-list var mı? Reviewer aynı mağazalarda test ediyor | §4 (b) `[observed]` R9 |
 | (Storefront app) Script kurulumda otomatik ekleniyor, kaldırmada otomatik siliniyor mu? (kodda `createStorefrontJSScript` kurulum yolunda, `deleteStorefrontJSScript` uninstall handler'da) | §6.2 `[observed]` R5 |
 | Uygulama bağımsız, somut bir işlev sunuyor mu — yalnızca iletişim/tanıtım ekranı değil mi? | §1 `[observed]` R6 |
 | (Paid) Partner panel › Planlar'da planlar tanımlı ve Yayınlama'da her bölgenin "Bölgedeki Aktif Planlar"ı doğru para biriminde mi? Plan açıklamaları girildi mi? | §1, §6.4 `[partner-panel]` |
@@ -125,6 +129,7 @@ Write the report in Turkish following `references/report-template.md` exactly: K
 - Calling `signature && …` on the **callback** a hole. It is the documented posture. On **webhooks that mutate state** and on **API actions** the signature is always present and must be verified — that is where Blockers live.
 - Passing §4 because `closeLoader()` exists. Necessary, not sufficient: a blank screen after it is §10 #13.
 - Rejecting an external dashboard on sight. Shape (b) is allowed; it fails only without the in-iframe link/instruction; the test account is a Beyan row.
+- Passing §4 (b) after reading only the first-install branch. R8 rejections all came from the *second* open: registered or half-registered merchant, app already installed.
 - Trusting scanner silence for routes. The inventory from Step 2 is the truth.
 - Applying fixes before the user answered, or applying non-catalogue fixes.
 - Saying "review'dan geçer".

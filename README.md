@@ -54,7 +54,7 @@ demez; "bu kural setine göre Blocker kalmadı" der.
 | `[schema]` | Canlı Admin API introspection'ı (`scripts/schema.py`, token gerekmez). **v1 ve v2 farklı şemalardır**; resmi örnekler v2 kullanır, `schema.py --v1` v1'e bakar |
 | `[mcp]` | ikas admin MCP (124 operasyonun 59'u; imza render hatası olabilir, `[schema]` üstündür) |
 | `[security]` | Standart web güvenliği akıl yürütmesi; ikas kuralı değil |
-| `[observed]` | Gerçek review ret mesajları (§12 › R1–R7), canlı dev-store deneyleri (§12 › E1–E6) ve geliştirici destek kayıtları (§12 › S1) |
+| `[observed]` | Gerçek review ret mesajları (§12 › R1–R10), canlı dev-store deneyleri (§12 › E1–E6) ve geliştirici destek kayıtları (§12 › S1) |
 
 Her bulgu ya ihlal ettiği bölümü zikreder (§2.2, §6.1, §10 #4…) ya da "kontrat dışı"
 etiketlenir. Docs ile şema/deney çeliştiğinde hangisinin kazandığı kuralda yazılıdır.
@@ -117,7 +117,7 @@ koşulur, `git diff --stat` raporlanır, commit atılmaz.
 ```
 plugins/ikas-app/skills/ikas-app-preflight/
 ├── SKILL.md                        # prosedür, argümanlar, onay akışı (İngilizce)
-├── references/app-review.md        # kaynak etiketli kural seti §0–§12 (R1–R7 retler, E1–E6 deneyler, S1)
+├── references/app-review.md        # kaynak etiketli kural seti §0–§12 (R1–R10 retler, E1–E6 deneyler, S1)
 ├── references/report-template.md   # Türkçe rapor şablonu + örnek
 ├── references/fix-catalogue.md     # onay sonrası uygulanabilir tarifler F1–F14
 ├── scripts/scan.py                 # kanıt tarayıcısı (--json, --section; import'ları takip eder; App + Pages Router)
